@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Peachi Viewer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap" rel="stylesheet">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    html, body { margin: 0; height: 100%; background: #120c1c; color: #fff; font-family: Kanit, sans-serif; overflow: hidden; }
+    #ui { position: fixed; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+    #ui div { display: flex; gap: 6px; flex-wrap: wrap; }
+    button { font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid #ff7eb6; border-radius: 8px; background: #2a1830; color: #ffd0e2; cursor: pointer; }
+    button.on { background: #ff7eb6; color: #2a1020; }
+    #info { font-size: 12px; opacity: 0.7; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="expr"></div>
+    <div id="pose"></div>
+    <div><button id="ghost">ghost</button><button id="spin">spin</button>
+      <label>glow <input id="glow" type="range" min="0" max="1" step="0.05" value="0"></label></div>
+    <div id="info"></div>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { buildPeachi, buildHeadphonesItem } from './js/peachi/model.js';
+    import { EXPRESSIONS } from './js/peachi/face.js';
+    import { POSES } from './js/peachi/anim.js';
+
+    // URL params: ?angle=90&expr=angry&pose=reach&ghost=0&glow=0.5&zoom=face
+    const q = new URLSearchParams(location.search);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x120c1c);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.45;
+    scene.add(new THREE.HemisphereLight(0xc9b8ff, 0x2a1030, 1.2));
+    const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(1.5, 2.5, 2.5); scene.add(key);
+    const rim = new THREE.PointLight(0xff5fa8, 3, 6); rim.position.set(-1.2, 1.4, -1.2); scene.add(rim);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 40), new THREE.MeshStandardMaterial({ color: 0x241634, roughness: 0.9 }));
+    floor.rotation.x = -Math.PI / 2; scene.add(floor);
+
+    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 50);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    if (q.get('zoom') === 'face') { camera.position.set(0, 1.3, 1.1); controls.target.set(0, 1.28, 0); }
+    else { camera.position.set(0.4, 1.05, 2.9); controls.target.set(0.2, 0.8, 0); }
+    controls.update();
+
+    let ghost = q.get('ghost') !== '0';
+    let spin = !q.has('angle');
+    let expr = q.get('expr') || 'happy', pose = q.get('pose') || 'idle', glow = Number(q.get('glow') || 0);
+    let peachi;
+    function rebuild() {
+      const rotY = peachi ? peachi.group.rotation.y : THREE.MathUtils.degToRad(Number(q.get('angle') || 0));
+      if (peachi) { scene.remove(peachi.group); peachi.dispose(); }
+      peachi = buildPeachi({ ghost });
+      peachi.group.rotation.y = rotY;
+      peachi.setExpression(expr); peachi.setPose(pose); peachi.setGlow(glow);
+      scene.add(peachi.group);
+      refresh();
+    }
+
+    const item = buildHeadphonesItem();
+    item.position.set(0.8, 0, 0.1); scene.add(item);
+
+    const $ = (id) => document.getElementById(id);
+    function buttons(el, names, onClick) {
+      for (const n of names) { const b = document.createElement('button'); b.textContent = n; b.dataset.n = n; b.onclick = () => { onClick(n); refresh(); }; el.appendChild(b); }
+    }
+    buttons($('expr'), EXPRESSIONS, (n) => { expr = n; peachi.setExpression(n); });
+    buttons($('pose'), POSES, (n) => { pose = n; peachi.setPose(n); });
+    $('ghost').onclick = () => { ghost = !ghost; rebuild(); };
+    $('spin').onclick = () => { spin = !spin; refresh(); };
+    $('glow').value = glow;
+    $('glow').oninput = (e) => { glow = Number(e.target.value); peachi.setGlow(glow); };
+    function refresh() {
+      document.querySelectorAll('#expr button').forEach((b) => b.classList.toggle('on', b.dataset.n === expr));
+      document.querySelectorAll('#pose button').forEach((b) => b.classList.toggle('on', b.dataset.n === pose));
+      $('ghost').classList.toggle('on', ghost); $('spin').classList.toggle('on', spin);
+      let tris = 0;
+      peachi.group.traverse((o) => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+      $('info').textContent = `model tris: ${Math.round(tris)} · drag to orbit`;
+    }
+    rebuild();
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    const clock = new THREE.Clock();
+    renderer.setAnimationLoop(() => {
+      const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime;
+      if (spin) peachi.group.rotation.y += dt * 0.5;
+      peachi.update(dt, t);
+      item.userData.update(dt, t);
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>
