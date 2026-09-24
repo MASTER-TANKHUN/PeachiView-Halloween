@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>UI test</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&family=Mitr:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    #app { background: radial-gradient(ellipse at 40% 60%, #3a1b52, #120720 60%, #05020a); }
+    #app::after { content: ''; position: absolute; left: 44%; top: 34%; width: 150px; height: 220px; border-radius: 60px 60px 20px 20px; background: radial-gradient(circle at 50% 30%, #ffb3d6, #ff7eb6 40%, transparent 70%); opacity: 0.35; filter: blur(6px); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="hud"></div>
+  <script type="module">
+    import { UI } from './js/ui.js';
+    import { Scream } from './js/mic.js';
+    import { sfx, ambient } from './js/audio.js';
+    import { normalChat, spamChat, superChats, peachiLines, endings } from './js/data/chat.js';
+
+    const q = new URLSearchParams(location.search);
+    const stopAt = q.get('screen'); // menu | intro | gameover | win | (default play)
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    const assert = (c, m) => { if (!c) console.error('ASSERT FAILED: ' + m); };
+
+    // data checks
+    assert(normalChat.length >= 25, 'normalChat >= 25');
+    assert(spamChat.length >= 15, 'spamChat >= 15');
+    assert(superChats.length >= 10 && superChats.every((s) => s.amount > 0), 'superChats >= 10');
+    for (const k of ['happy', 'cry', 'angry', 'scream', 'stunned', 'found', 'win']) assert(peachiLines[k]?.length >= 5, 'peachiLines.' + k);
+
+    async function main() {
+    UI.init();
+    UI.onStart(() => console.log('start clicked'));
+    UI.onRetry(() => console.log('retry clicked'));
+
+    // audio: every sfx must run without throwing (context may be suspended headless)
+    sfx.init();
+    sfx.setMaster(0.5);
+    for (const n of ['jumpscare', 'pickup', 'place', 'ban', 'whisper', 'step', 'flicker', 'superchat', 'tick', 'win', 'lose', 'scream', 'stun', 'giggle']) sfx.play(n);
+    ambient.start();
+    ambient.setTension(0.7);
+
+    Scream.onScream(() => console.log('SCREAM!'));
+    await Scream.init();
+    let last = performance.now();
+    (function tick() {
+      const t = performance.now();
+      Scream.update((t - last) / 1000); last = t;
+      UI.setScreamMeter(Math.max(Scream.level, Scream.charge), Scream.cooldown, Scream.usingMic);
+      requestAnimationFrame(tick);
+    })();
+
+    if (stopAt === 'menu') return; // stay on menu
+    await wait(250);
+    UI.showScreen('intro', { title: 'คืนที่ 1', text: 'หาหูฟังหูแมวให้พีชชี่ ก่อนตี 6…' });
+    if (stopAt === 'intro') return;
+    await wait(300);
+    UI.showScreen('gameover', endings.timeout);
+    if (stopAt === 'gameover') return;
+    await wait(300);
+    UI.showScreen('win', endings.win);
+    if (stopAt === 'win') return;
+    await wait(300);
+
+    UI.showScreen('play');
+    UI.setClock(3, 20);
+    UI.setViewers(1200);
+    UI.setBattery(64);
+    UI.setMood('angry');
+    UI.setObjective('หาหูฟังหูแมวของพีชชี่ 🎧');
+    UI.setPrompt('[E] หยิบหูฟังหูแมว');
+    UI.toast('📢 มอดใหม่เข้าห้องแล้ว!');
+    UI.subtitle(pick(peachiLines.angry), 5000);
+    UI.vignette(0.35);
+    UI.flash('#ff7eb6');
+    UI.shake(300);
+
+    for (let i = 0; i < 6; i++) UI.chat.push({ ...pick(normalChat), type: 'normal' });
+    UI.chat.push({ ...spamChat[0], type: 'spam' });
+    UI.chat.push({ ...superChats[3], type: 'superchat' });
+    UI.chat.push({ ...pick(normalChat), type: 'normal' });
+    UI.chat.push({ ...spamChat[1], type: 'spam' });
+    assert(UI.chat.spamAges().length === 2, 'spamAges 2');
+    assert(UI.chat.banOldestSpam() === true, 'ban ok');
+    assert(UI.chat.spamAges().length === 1, 'spamAges 1 after ban');
+    UI.chat.push({ ...spamChat[2], type: 'spam' });
+    UI.chat.push({ ...superChats[7], type: 'superchat' });
+    UI.chat.push({ ...pick(normalChat), type: 'normal' });
+    UI.chat.push({ ...spamChat[5], type: 'spam' });
+    UI.chat.push({ ...pick(normalChat), type: 'normal' });
+    await wait(200);
+    UI.setViewers(1190);
+    UI.setClock(3, 30);
+    for (let i = 0; i < 10; i++) Scream.update(0), window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
+    console.log('spam ages', UI.chat.spamAges().map((a) => a.toFixed(2)).join(','), 'charge', Scream.charge.toFixed(2), 'mic', Scream.usingMic);
+    const noSpam = (() => { UI.chat.clear(); return UI.chat.banOldestSpam(); })();
+    assert(noSpam === false, 'ban with no spam → false');
+    // refill after clear test
+    for (let i = 0; i < 5; i++) UI.chat.push({ ...normalChat[i + 3], type: 'normal' });
+    UI.chat.push({ ...spamChat[0], type: 'spam' });
+    UI.chat.push({ ...superChats[3], type: 'superchat' });
+    UI.chat.push({ ...normalChat[12], type: 'normal' });
+    UI.chat.push({ ...spamChat[6], type: 'spam' });
+    UI.chat.push({ ...normalChat[20], type: 'normal' });
+    UI.chat.push({ ...superChats[7], type: 'superchat' });
+    UI.chat.push({ ...spamChat[12], type: 'spam' });
+    UI.chat.push({ ...normalChat[1], type: 'normal' });
+    UI.setViewers(1187);
+    console.log('ui-test done');
+    }
+    main();
+  </script>
+</body>
+</html>

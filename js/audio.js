@@ -1,0 +1,416 @@
+// Procedural Web Audio: one-shot sfx + ambient drone/heartbeat. No audio files.
+// Chain: voices → master gain (≤ 0.6) → DynamicsCompressor (limiter) → destination.
+
+const MASTER_CAP = 0.6;
+let ctx = null;
+let master = null;
+let limiter = null;
+let noiseBuf = null;
+let masterLevel = 0.5;
+
+function ensure() {
+  if (ctx) {
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    return ctx;
+  }
+  const AC = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
+  if (!AC) return null;
+  try {
+    ctx = new AC();
+  } catch (e) {
+    console.warn('[audio] no AudioContext', e);
+    return null;
+  }
+  limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -10;
+  limiter.knee.value = 4;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.002;
+  limiter.release.value = 0.2;
+  master = ctx.createGain();
+  master.gain.value = masterLevel;
+  master.connect(limiter).connect(ctx.destination);
+
+  // 2 s of white noise, reused by every noise voice
+  noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+  // resume on any later gesture (autoplay policies)
+  const wake = () => { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); };
+  window.addEventListener('pointerdown', wake);
+  window.addEventListener('keydown', wake);
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  return ctx;
+}
+
+// ---------- tiny synth helpers ----------
+const rand = (a, b) => a + Math.random() * (b - a);
+
+function env(g, t, a, peak, hold, rel) {
+  g.gain.cancelScheduledValues(t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.setValueAtTime(peak, t + a + hold);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + rel);
+  return t + a + hold + rel;
+}
+
+function out(dest, pan = 0) {
+  if (pan && ctx.createStereoPanner) {
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    p.connect(dest || master);
+    return p;
+  }
+  return dest || master;
+}
+
+/** oscillator voice: freq may be number or [start, end] (exp glide) */
+function tone({ type = 'sine', freq = 440, t = ctx.currentTime, a = 0.005, hold = 0, rel = 0.15, vol = 0.3, pan = 0, detune = 0, vib = 0, vibRate = 6, dest }) {
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.detune.value = detune;
+  const [f0, f1] = Array.isArray(freq) ? freq : [freq, freq];
+  o.frequency.setValueAtTime(f0, t);
+  if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + a + hold + rel);
+  if (vib) {
+    const lfo = ctx.createOscillator();
+    const lg = ctx.createGain();
+    lfo.frequency.value = vibRate;
+    lg.gain.value = vib;
+    lfo.connect(lg).connect(o.frequency);
+    lfo.start(t);
+    lfo.stop(t + a + hold + rel + 0.05);
+  }
+  const end = env(g, t, a, vol, hold, rel);
+  o.connect(g).connect(out(dest, pan));
+  o.start(t);
+  o.stop(end + 0.05);
+  return o;
+}
+
+/** filtered noise voice */
+function noise({ t = ctx.currentTime, a = 0.005, hold = 0, rel = 0.2, vol = 0.3, filter = 'bandpass', f = 1000, f1, q = 1, pan = 0, rate = 1, dest }) {
+  const s = ctx.createBufferSource();
+  s.buffer = noiseBuf;
+  s.loop = true;
+  s.playbackRate.value = rate;
+  const fl = ctx.createBiquadFilter();
+  fl.type = filter;
+  fl.Q.value = q;
+  fl.frequency.setValueAtTime(f, t);
+  if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t + a + hold + rel);
+  const g = ctx.createGain();
+  const end = env(g, t, a, vol, hold, rel);
+  s.connect(fl).connect(g).connect(out(dest, pan));
+  s.start(t, Math.random());
+  s.stop(end + 0.05);
+  return fl;
+}
+
+function distortion(amount = 30) {
+  const ws = ctx.createWaveShaper();
+  const n = 1024;
+  const c = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    c[i] = ((3 + amount) * x * 20 * (Math.PI / 180)) / (Math.PI + amount * Math.abs(x));
+  }
+  ws.curve = c;
+  return ws;
+}
+
+// ---------- sound recipes ----------
+const recipes = {
+  jumpscare(t) {
+    // sub thump
+    tone({ type: 'sine', freq: [120, 30], t, a: 0.005, rel: 0.6, vol: 0.9 });
+    // loud noise burst
+    noise({ t, a: 0.004, hold: 0.25, rel: 0.7, vol: 0.8, filter: 'highpass', f: 400, q: 0.5 });
+    // dissonant screech cluster through distortion
+    const ws = distortion(60);
+    const g = ctx.createGain();
+    g.gain.value = 0.35;
+    ws.connect(g).connect(master);
+    for (const [f, d] of [[880, 0], [932, 7], [1245, -12], [1661, 5]]) {
+      tone({ type: 'sawtooth', freq: [f, f * 1.5], t, a: 0.01, hold: 0.45, rel: 0.5, vol: 0.25, detune: d, vib: 40, vibRate: 13, dest: ws });
+    }
+  },
+  pickup(t) {
+    [659, 784, 988, 1319].forEach((f, i) => {
+      tone({ type: 'triangle', freq: f, t: t + i * 0.06, rel: 0.25, vol: 0.28 });
+      tone({ type: 'sine', freq: f * 2, t: t + i * 0.06, rel: 0.15, vol: 0.08 });
+    });
+    noise({ t: t + 0.2, rel: 0.4, vol: 0.06, filter: 'highpass', f: 6000 });
+  },
+  place(t) {
+    tone({ type: 'sine', freq: [140, 60], t, rel: 0.2, vol: 0.5 });
+    tone({ type: 'triangle', freq: 784, t: t + 0.08, rel: 0.5, vol: 0.25 });
+    tone({ type: 'triangle', freq: 1175, t: t + 0.22, rel: 0.8, vol: 0.25 });
+    tone({ type: 'sine', freq: 2350, t: t + 0.22, rel: 0.6, vol: 0.06 });
+  },
+  ban(t) {
+    // cartoon hammer "BONK"
+    tone({ type: 'square', freq: [520, 90], t, a: 0.002, rel: 0.18, vol: 0.28 });
+    tone({ type: 'sine', freq: [300, 120], t, a: 0.002, rel: 0.25, vol: 0.5 });
+    noise({ t, rel: 0.06, vol: 0.4, filter: 'bandpass', f: 2500, q: 2 });
+    tone({ type: 'sine', freq: 1568, t: t + 0.12, rel: 0.2, vol: 0.08 });
+  },
+  whisper(t) {
+    const pan = rand(-0.9, 0.9);
+    const syll = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < syll; i++) {
+      const tt = t + i * rand(0.12, 0.2);
+      noise({ t: tt, a: 0.04, hold: 0.04, rel: 0.12, vol: 0.18, filter: 'bandpass', f: rand(1200, 3200), f1: rand(800, 2400), q: 6, pan });
+      noise({ t: tt, a: 0.03, rel: 0.1, vol: 0.08, filter: 'highpass', f: 5000, pan });
+    }
+  },
+  step(t) {
+    noise({ t, a: 0.003, rel: 0.09, vol: 0.35, filter: 'lowpass', f: rand(250, 420), q: 1.5 });
+    tone({ type: 'sine', freq: [rand(70, 95), 45], t, rel: 0.08, vol: 0.25 });
+  },
+  flicker(t) {
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    g.connect(master);
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = 100;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 900;
+    f.Q.value = 1.2;
+    o.connect(f).connect(g);
+    let tt = t;
+    for (let i = 0; i < 9; i++) {
+      const on = rand(0.02, 0.08);
+      g.gain.setValueAtTime(rand(0.08, 0.2), tt);
+      g.gain.setValueAtTime(0, tt + on);
+      if (Math.random() < 0.6) noise({ t: tt, rel: 0.03, vol: 0.25, filter: 'highpass', f: 3000 });
+      tt += on + rand(0.02, 0.09);
+    }
+    o.start(t);
+    o.stop(tt + 0.05);
+  },
+  superchat(t) {
+    // "ka-ching!"
+    noise({ t, rel: 0.05, vol: 0.3, filter: 'highpass', f: 4000 });
+    tone({ type: 'square', freq: 988, t: t + 0.02, rel: 0.08, vol: 0.12 });
+    tone({ type: 'square', freq: 1319, t: t + 0.1, hold: 0.05, rel: 0.4, vol: 0.12 });
+    tone({ type: 'sine', freq: 2637, t: t + 0.1, rel: 0.5, vol: 0.08, vib: 30, vibRate: 20 });
+    noise({ t: t + 0.1, a: 0.01, rel: 0.5, vol: 0.08, filter: 'highpass', f: 8000 });
+  },
+  tick(t) {
+    tone({ type: 'sine', freq: 2000, t, a: 0.001, rel: 0.03, vol: 0.2 });
+    noise({ t, a: 0.001, rel: 0.02, vol: 0.15, filter: 'highpass', f: 3000 });
+    tone({ type: 'sine', freq: 1500, t: t + 0.25, a: 0.001, rel: 0.03, vol: 0.12 });
+  },
+  win(t) {
+    const notes = [523, 659, 784, 1047, 784, 1047, 1319];
+    const times = [0, 0.12, 0.24, 0.36, 0.52, 0.64, 0.8];
+    notes.forEach((f, i) => {
+      const long = i === notes.length - 1;
+      tone({ type: 'triangle', freq: f, t: t + times[i], hold: long ? 0.4 : 0.05, rel: long ? 0.8 : 0.12, vol: 0.25, vib: long ? 8 : 0 });
+      tone({ type: 'square', freq: f / 2, t: t + times[i], hold: long ? 0.4 : 0.03, rel: long ? 0.6 : 0.1, vol: 0.05 });
+    });
+    for (let i = 0; i < 10; i++) tone({ type: 'sine', freq: rand(2000, 4200), t: t + 0.8 + i * 0.07, rel: 0.2, vol: 0.05 });
+  },
+  lose(t) {
+    // sad trombone: wah wah wah waaaah
+    const notes = [392, 370, 349, 330];
+    notes.forEach((f, i) => {
+      const last = i === 3;
+      const dest = ctx.createBiquadFilter();
+      dest.type = 'lowpass';
+      dest.frequency.setValueAtTime(700, t + i * 0.45);
+      dest.frequency.linearRampToValueAtTime(1800, t + i * 0.45 + 0.15);
+      dest.frequency.linearRampToValueAtTime(600, t + i * 0.45 + (last ? 1.4 : 0.4));
+      dest.Q.value = 3;
+      dest.connect(master);
+      tone({ type: 'sawtooth', freq: last ? [f, f * 0.94] : f, t: t + i * 0.45, a: 0.04, hold: last ? 0.9 : 0.25, rel: last ? 0.5 : 0.12, vol: 0.3, vib: last ? 10 : 2, vibRate: last ? 6 : 4, dest });
+    });
+  },
+  scream(t) {
+    // the player's scream shockwave: "AAAH" formant + whoosh + boom
+    const f1 = ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.frequency.value = 800; f1.Q.value = 5;
+    const f2 = ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.frequency.value = 1200; f2.Q.value = 6;
+    const mix = ctx.createGain();
+    mix.gain.value = 2.2;
+    const ws = distortion(20);
+    f1.connect(mix); f2.connect(mix);
+    mix.connect(ws).connect(master);
+    tone({ type: 'sawtooth', freq: [260, 340], t, a: 0.03, hold: 0.4, rel: 0.35, vol: 0.35, vib: 18, vibRate: 7, dest: f1 });
+    tone({ type: 'sawtooth', freq: [262, 345], t, a: 0.03, hold: 0.4, rel: 0.35, vol: 0.35, detune: 12, vib: 18, vibRate: 7.5, dest: f2 });
+    noise({ t, a: 0.02, hold: 0.2, rel: 0.6, vol: 0.35, filter: 'bandpass', f: 300, f1: 3000, q: 0.8 });
+    tone({ type: 'sine', freq: [90, 35], t, rel: 0.5, vol: 0.6 });
+  },
+  stun(t) {
+    // cartoon dizzy "boi-oi-oing" + twinkle stars
+    tone({ type: 'sine', freq: [300, 700], t, a: 0.005, hold: 0.1, rel: 0.5, vol: 0.3, vib: 120, vibRate: 14 });
+    [2093, 2637, 3136, 2637, 2093].forEach((f, i) => tone({ type: 'triangle', freq: f, t: t + 0.25 + i * 0.09, rel: 0.12, vol: 0.07 }));
+  },
+  giggle(t) {
+    // cute "hi-hi-hi-hii~"
+    const n = 4 + Math.floor(Math.random() * 3);
+    const base = rand(820, 980);
+    for (let i = 0; i < n; i++) {
+      const tt = t + i * 0.11;
+      const f = base * (1 + (n - i) * 0.04) * (i === n - 1 ? 1.2 : 1);
+      const last = i === n - 1;
+      tone({ type: 'triangle', freq: last ? [f, f * 0.8] : [f * 1.08, f], t: tt, a: 0.008, hold: last ? 0.08 : 0.02, rel: last ? 0.25 : 0.06, vol: 0.22, vib: 25, vibRate: 22 });
+      tone({ type: 'sine', freq: f * 2.01, t: tt, a: 0.008, rel: 0.05, vol: 0.05 });
+      noise({ t: tt, a: 0.005, rel: 0.04, vol: 0.05, filter: 'highpass', f: 5000 }); // breathy "h"
+    }
+  },
+};
+
+export const sfx = {
+  init() {
+    return !!ensure();
+  },
+  play(name) {
+    if (!ensure()) return;
+    const r = recipes[name];
+    if (!r) { console.warn('[sfx] unknown sound', name); return; }
+    try { r(ctx.currentTime + 0.01); } catch (e) { console.warn('[sfx] failed', name, e); }
+  },
+  setMaster(v) {
+    masterLevel = Math.max(0, Math.min(MASTER_CAP, Number(v) || 0));
+    if (master) master.gain.setTargetAtTime(masterLevel, ctx.currentTime, 0.05);
+  },
+  names: Object.keys(recipes),
+};
+
+// ---------- ambient: drone + wind + heartbeat + random creaks ----------
+let amb = null;
+
+function scheduleBeat(t, strength) {
+  const g = amb.hbGain;
+  // lub
+  const o1 = ctx.createOscillator();
+  const e1 = ctx.createGain();
+  o1.frequency.setValueAtTime(70, t);
+  o1.frequency.exponentialRampToValueAtTime(38, t + 0.12);
+  env(e1, t, 0.008, strength, 0.02, 0.14);
+  o1.connect(e1).connect(g);
+  o1.start(t); o1.stop(t + 0.25);
+  // dub
+  const t2 = t + 0.22;
+  const o2 = ctx.createOscillator();
+  const e2 = ctx.createGain();
+  o2.frequency.setValueAtTime(62, t2);
+  o2.frequency.exponentialRampToValueAtTime(34, t2 + 0.12);
+  env(e2, t2, 0.008, strength * 0.7, 0.02, 0.16);
+  o2.connect(e2).connect(g);
+  o2.start(t2); o2.stop(t2 + 0.25);
+}
+
+function tickAmbient() {
+  if (!amb) return;
+  const now = ctx.currentTime;
+  const k = amb.tension;
+  const bpm = 58 + k * 82;
+  while (amb.nextBeat < now + 0.3) {
+    if (amb.nextBeat < now) amb.nextBeat = now + 0.02;
+    scheduleBeat(amb.nextBeat, 0.25 + k * 0.75);
+    amb.nextBeat += 60 / bpm;
+  }
+  if (now > amb.nextCreak) {
+    const t = now + 0.05;
+    // door creak / floorboard
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = rand(500, 1400); f.Q.value = 8;
+    f.connect(amb.bus);
+    tone({ type: 'sawtooth', freq: [rand(90, 160), rand(50, 80)], t, a: 0.2, hold: rand(0.2, 0.6), rel: 0.3, vol: 0.12, vib: 15, vibRate: rand(8, 25), dest: f, pan: rand(-0.8, 0.8) });
+    amb.nextCreak = now + rand(9, 22) * (1 - k * 0.5);
+  }
+}
+
+export const ambient = {
+  start() {
+    if (!ensure() || amb) return;
+    const t = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(0.0001, t);
+    bus.gain.exponentialRampToValueAtTime(0.5, t + 3);
+    bus.connect(master);
+
+    // drone: detuned low saws through a lowpass whose cutoff rises with tension
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 180; lp.Q.value = 4;
+    const droneGain = ctx.createGain();
+    droneGain.gain.value = 0.35;
+    lp.connect(droneGain).connect(bus);
+    const oscs = [];
+    for (const [f, type] of [[55, 'sawtooth'], [55.4, 'sawtooth'], [82.4, 'triangle'], [27.5, 'sine']]) {
+      const o = ctx.createOscillator();
+      o.type = type; o.frequency.value = f;
+      o.connect(lp); o.start(t);
+      oscs.push(o);
+    }
+    // slow filter wobble
+    const lfo = ctx.createOscillator();
+    const lfoG = ctx.createGain();
+    lfo.frequency.value = 0.07; lfoG.gain.value = 60;
+    lfo.connect(lfoG).connect(lp.frequency); lfo.start(t);
+    oscs.push(lfo);
+
+    // dissonant high tone that fades in with tension
+    const high = ctx.createOscillator();
+    high.type = 'sine'; high.frequency.value = 1244; // tritone-ish against the drone
+    const high2 = ctx.createOscillator();
+    high2.type = 'sine'; high2.frequency.value = 1318;
+    const highG = ctx.createGain();
+    highG.gain.value = 0;
+    high.connect(highG); high2.connect(highG); highG.connect(bus);
+    high.start(t); high2.start(t);
+    oscs.push(high, high2);
+
+    // wind: looping noise through a wandering bandpass
+    const wind = ctx.createBufferSource();
+    wind.buffer = noiseBuf; wind.loop = true;
+    const wf = ctx.createBiquadFilter();
+    wf.type = 'bandpass'; wf.frequency.value = 500; wf.Q.value = 1.5;
+    const wg = ctx.createGain();
+    wg.gain.value = 0.12;
+    const wl = ctx.createOscillator();
+    const wlg = ctx.createGain();
+    wl.frequency.value = 0.11; wlg.gain.value = 300;
+    wl.connect(wlg).connect(wf.frequency); wl.start(t);
+    wind.connect(wf).connect(wg).connect(bus);
+    wind.start(t);
+    oscs.push(wl, wind);
+
+    const hbGain = ctx.createGain();
+    hbGain.gain.value = 0.15;
+    hbGain.connect(bus);
+
+    amb = { bus, lp, highG, hbGain, oscs, tension: 0, nextBeat: t + 0.5, nextCreak: t + 6, timer: setInterval(tickAmbient, 100) };
+    ambient.setTension(0);
+  },
+  stop() {
+    if (!amb) return;
+    const a = amb;
+    amb = null;
+    clearInterval(a.timer);
+    const t = ctx.currentTime;
+    a.bus.gain.cancelScheduledValues(t);
+    a.bus.gain.setValueAtTime(Math.max(0.0001, a.bus.gain.value), t);
+    a.bus.gain.exponentialRampToValueAtTime(0.0001, t + 1);
+    for (const o of a.oscs) { try { o.stop(t + 1.1); } catch {} }
+    setTimeout(() => a.bus.disconnect(), 1300);
+  },
+  setTension(v) {
+    if (!amb) return;
+    const k = Math.max(0, Math.min(1, Number(v) || 0));
+    amb.tension = k;
+    const t = ctx.currentTime;
+    amb.lp.frequency.setTargetAtTime(160 + k * 700, t, 0.5);
+    amb.highG.gain.setTargetAtTime(k * k * 0.03, t, 0.5);
+    amb.hbGain.gain.setTargetAtTime(0.12 + k * 0.9, t, 0.3);
+  },
+};
