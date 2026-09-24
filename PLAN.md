@@ -39,11 +39,35 @@
 
 **มุกแชต/ซุปแชตปลอม (ตัวอย่าง):** "กระสือ: ขอรหัส Wi-Fi หน่อย" · "ผีปอบบริจาค 20฿: หมูกระทะหมดแล้วนะ" · "แม่นาคกดติดตามแล้วค่ะ (แขนยาวกดทันทุกไลฟ์)"
 
-## 5. โมเดลตัวละคร: แผน A → B
-- **A (ทำก่อน): Sprite 2D แบบ Doom** — ตัดชีตเป็น PNG พื้นใส (`front/side/back/face_*`)
-  เลือก texture ตามมุมระหว่างผีกับกล้อง + ShaderMaterial: โปร่งแสง, กะพริบ, glitch สี, ลอย
-- **B (อัปเกรดทีหลัง): AI Image→3D** — อัปภาพหน้าตรงเข้า Tripo3D / Meshy / Hunyuan3D → GLB + auto-rig
-  สลับเข้ามาแทนได้เลยเพราะทุกอย่างผ่าน interface `GhostVisual` เดียวกัน
+## 5. โมเดลตัวละคร: Low-poly ปั้นด้วยโค้ด Three.js (ไม่ใช้ไฟล์โมเดล)
+สัดส่วน **ชิบิ (หัว 1 : ตัว 2)** → ตลก น่ารัก และจำง่ายแม้ polygon น้อย · งบ ~3k สามเหลี่ยม · `flatShading: true`
+
+**จุดจำ "นี่คือพีชชี่" (ต้องมีครบ):**
+| ชิ้น | วิธีปั้น |
+|---|---|
+| หูฟังหูแมว ชมพู/ขาว + โลโก้พีชที่ครอบหู | `TorusGeometry` (คาด) + `ConeGeometry` 4 ด้าน (หู) + `CylinderGeometry` (ครอบหู) |
+| ผมยาวหยักศก น้ำตาล→ปลายชมพู | กลุ่ม `ConeGeometry`/`TubeGeometry` + vertex color ไล่สี |
+| เสื้อคลุมโฮโลแกรมเปิดไหล่ | `MeshPhysicalMaterial` + `iridescence` (สีรุ้งในตัว) |
+| เสื้อครอปขาว โลโก้พีช "PEACHI" | `CanvasTexture` |
+| กระโปรงจีบดำ ขลิบชมพู | `CylinderGeometry` เปิดปลาย 12 ด้าน ขยับ vertex เป็นจีบ |
+| สายห้อย "PEACHI" ชมพู + เข็มขัดหัวใจ | `BoxGeometry` บาง + `ExtrudeGeometry` รูปหัวใจ |
+| ถุงเท่าข้างเดียว "249 PEACH" + สายรัดต้นขาหัวใจ | `CanvasTexture` ขาข้างขวา |
+| รองเท้าผ้าใบขาวชมพูหนาๆ | `BoxGeometry` ลบเหลี่ยม |
+| โชคเกอร์หัวใจ | `TorusGeometry` + หัวใจ extrude |
+
+**หน้า = CanvasTexture วาดเอง** (ตาโตสีอำพันแบบอนิเมะ) → สลับ 4 สีหน้าตามชีต: ยิ้ม / ร้องไห้ / โกรธเขี้ยว💢 / กรีด
+ไม่ต้องปั้นหน้า 3D = จุดที่ยากสุดหายไป
+
+**เวอร์ชันผี:** ขาจางหายด้วย shader (`onBeforeCompile` ลด alpha ตามความสูง) + ขอบเรืองแสง Fresnel ชมพู + ลอยขึ้นลง
+**อนิเมชัน:** ใช้ `Group` ซ้อนเป็นโครง (หัว/ลำตัว/แขน/ผม) ขยับด้วยโค้ด — โคลงหัว ผมพลิ้ว แขนยื่นมาคว้า ไม่ต้องริก
+
+```
+js/peachi/model.js  # buildPeachi({ ghost: true }) → THREE.Group
+js/peachi/face.js   # วาดหน้า 4 แบบบน canvas
+js/peachi/anim.js   # float, hair sway, reach, jumpscare pose
+peachi-viewer.html  # หน้าหมุนดูโมเดล เทียบกับชีต
+```
+แผนสำรอง (ถ้าอยากได้ละเอียดกว่า): AI Image→3D (Tripo3D / Meshy) → GLB สลับแทนผ่าน `GhostVisual` เดิม
 
 ## 6. Tech
 - Three.js (ES module ผ่าน import map จาก jsdelivr) — ไม่ต้อง build
@@ -71,11 +95,11 @@ assets/sprites/ models/ audio/ level/
 ## 7. ไทม์ไลน์ (ถึงฮาโลวีน 31 ต.ค.)
 | สัปดาห์ | งาน |
 |---|---|
-| 1 | ตัดชีตเป็น sprite, ห้อง FPS + ไฟฉาย, ผีพีชชี่ shader |
+| 1 | ปั้นพีชชี่ low-poly + หน้า 4 แบบ (viewer), ห้อง FPS + ไฟฉาย |
 | 2 | นาฬิกาคืน, Mood AI, ไมค์กรีด, แชต/ยอดวิว |
 | 3 | คืน 2–3: กระสือ, ผีปอบ, บอส, jumpscare |
 | 4 | เสียง, มุก, ฉากจบ, playtest |
-| 5 | Buffer + deploy (+ อัปเกรด GLB ถ้าทัน) |
+| 5 | Buffer + deploy |
 
 ## 8. ความเสี่ยง / สิ่งที่ต้องมี
 - ขออนุญาตพีชชี่ใช้ตัวละครในแฟนเกม
