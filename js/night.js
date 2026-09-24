@@ -4,7 +4,10 @@ import { buildHeadphonesItem } from './peachi/model.js';
 import { UI } from './ui.js';
 import { sfx, ambient } from './audio.js';
 import { Scream } from './mic.js';
-import { normalChat, spamChat, superChats, peachiLines } from './data/chat.js';
+import * as chatData from './data/chat.js';
+
+const { normalChat, spamChat, superChats, peachiLines } = chatData;
+const ENDINGS = chatData.endings || {};
 
 export const SECONDS_PER_HOUR = 50;
 export const END_HOUR = 6;
@@ -57,6 +60,9 @@ export class Night {
     scene.add(this.holder);
 
     peachi.onCaught = () => this._lose('caught');
+    // Player (B) exposes an onStep hook synced to head-bob; fall back to distance-based steps otherwise.
+    this.nativeSteps = 'onStep' in player;
+    if (this.nativeSteps) player.onStep = () => { if (this.state === 'play') sfx.play('step'); };
     Scream.onScream(() => this._onScream());
     this._resetVars();
   }
@@ -134,6 +140,7 @@ export class Night {
     UI.setMood('happy');
     UI.setPrompt(null);
     UI.vignette(0);
+    if (typeof UI.chat.clear === 'function') UI.chat.clear();
     UI.chat.push({ user: 'PeachiView', text: 'ไลฟ์กลับมาแล้ว!? ใครเปิดเนี่ย…', type: 'normal' });
     UI.toast('หาหูฟังหูแมว แล้วเอาไปคืนที่โต๊ะสตรีมก่อนตีหก!');
     try { ambient.start(); ambient.setTension(0); } catch (e) { console.warn('ambient', e); }
@@ -204,7 +211,8 @@ export class Night {
     this._end();
     if (reason !== 'caught') sfx.play('lose');
     if (reason === 'timeout') { this.peachi._setExpression('scream'); UI.flash('#ff2a6d'); UI.shake(600); }
-    UI.showScreen('gameover', LOSE_TEXT[reason] || LOSE_TEXT.caught);
+    const key = reason === 'caught' ? 'jumpscare' : reason;
+    UI.showScreen('gameover', ENDINGS[key] || LOSE_TEXT[reason] || LOSE_TEXT.caught);
     this.onEnd('gameover', reason);
   }
 
@@ -293,12 +301,14 @@ export class Night {
       }
     }
 
-    // --- footsteps
-    const p = player.position;
-    const moved = Math.hypot(p.x - this.lastPos.x, p.z - this.lastPos.z);
-    if (moved < 1) this.stepAcc += moved; // ignore teleports
-    this.lastPos.copy(p);
-    if (this.stepAcc > 0.8) { this.stepAcc = 0; sfx.play('step'); }
+    // --- footsteps (fallback when the player has no onStep hook)
+    if (!this.nativeSteps) {
+      const p = player.position;
+      const moved = Math.hypot(p.x - this.lastPos.x, p.z - this.lastPos.z);
+      if (moved < 1) this.stepAcc += moved; // ignore teleports
+      this.lastPos.copy(p);
+      if (this.stepAcc > 0.8) { this.stepAcc = 0; sfx.play('step'); }
+    }
 
     // --- HUD
     this._updateHud();
@@ -334,21 +344,27 @@ export class Night {
     }
   }
 
-  // Each spam older than SPAM_TTL costs 10 viewers exactly once (counting approach:
-  // ages only grow and bans/scroll-off only remove, so the "old" count is monotonic per spam).
+  // Each spam older than SPAM_TTL costs 10 viewers exactly once.
+  // Preferred: UI.chat.expireSpam (extra) removes the punished spam so Q keeps targeting fresh ones.
+  // Fallback (contract only): count spam past the TTL; ages only grow and bans only remove.
   _updateSpamPenalty() {
-    const ages = UI.chat.spamAges() || [];
-    let n = 0;
-    for (const a of ages) if (a > SPAM_TTL) n++;
-    if (n > this.spamPenalized) {
-      const k = n - this.spamPenalized;
+    let k = 0;
+    if (typeof UI.chat.expireSpam === 'function') {
+      k = UI.chat.expireSpam(SPAM_TTL) || 0;
+    } else {
+      const ages = UI.chat.spamAges() || [];
+      let n = 0;
+      for (const a of ages) if (a > SPAM_TTL) n++;
+      k = Math.max(0, n - this.spamPenalized);
+      this.spamPenalized = n;
+    }
+    if (k > 0) {
       this._addViewers(-10 * k);
       if (this.time - this.penaltyToastAt > 3) {
         this.penaltyToastAt = this.time;
         UI.toast(`สแปมค้างนานเกิน! ผู้ชม −${10 * k} (กด Q แบน)`);
       }
     }
-    this.spamPenalized = n;
   }
 
   _updateHud() {

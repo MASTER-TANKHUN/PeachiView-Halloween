@@ -451,7 +451,7 @@ export function buildLevel(scene) {
   plane(1.15, 0.62, tvMat, 9.785, 1.16, 4.0, -Math.PI / 2, 'tv-screen');
 
   // ---------------- lights
-  const hemi = new THREE.HemisphereLight(0x5a4a8a, 0x120a18, 0.45);
+  const hemi = new THREE.HemisphereLight(0x5a4a8a, 0x120a18, 0.6);
   root.add(hemi);
   const lights = [];
   function point(color, intensity, dist, x, y, z, kind) {
@@ -493,7 +493,7 @@ export function buildLevel(scene) {
     V(-7.0, 0, 3.5), V(-2.0, 0, 5.2), V(0.5, 0, 2.5),
     V(5.0, 0, 3.2), V(8.3, 0, 2.8),
   ];
-  const spawn = { position: V(-6, 0, -3.3), yaw: 0 };
+  const spawn = { position: V(-5.0, 0, -2.8), yaw: 0.28 }; // facing the stream desk
 
   // ---------------- runtime
   let flicker = false, flickT = 0, flickM = 1;

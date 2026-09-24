@@ -87,14 +87,18 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((res) => setTimeout(res, ms))]);
 }
 
+const INTRO_MS = 3200;
 UI.onStart(async () => {
   if (game.state !== 'menu') return;
   game.state = 'intro';
+  const t0 = performance.now();
   try { sfx.init(); } catch (e) { console.warn('sfx.init failed', e); }
-  UI.showScreen('intro');
+  UI.showScreen('intro', { title: 'คืนที่ 1', clock: '00:00', text: 'หาหูฟังหูแมวให้พีชชี่ แล้วเอาไปวางคืนที่โต๊ะสตรีมก่อนตี 6…' });
   try { await withTimeout(Promise.resolve(Scream.init()), 8000); } catch (e) { console.warn('mic unavailable, using Space fallback', e); }
-  startNight();
-  safeLock();
+  safeLock(); // as soon as the mic prompt is gone (gesture may still be fresh); otherwise the click hint re-locks
+  const rest = INTRO_MS - (performance.now() - t0);
+  if (rest > 0) await new Promise((r) => setTimeout(r, rest));
+  if (game.state === 'intro') startNight();
 });
 
 UI.onRetry(() => {
@@ -105,7 +109,8 @@ UI.onRetry(() => {
 
 // re-lock on click while playing (mousedown so it doesn't double up with the retry button's click)
 window.addEventListener('mousedown', () => {
-  if (game.state === 'play' && !AUTOSTART && !player.isLocked && night.state === 'play') safeLock();
+  if (AUTOSTART || player.isLocked) return;
+  if ((game.state === 'play' && night.state === 'play') || game.state === 'intro') safeLock();
 });
 
 window.addEventListener('keydown', (e) => {
