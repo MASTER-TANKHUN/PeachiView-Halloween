@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Peachi Viewer</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap" rel="stylesheet">
   <script type="importmap">
   {
     "imports": {
@@ -14,52 +13,79 @@
   }
   </script>
   <style>
-    html, body { margin: 0; height: 100%; background: #120c1c; color: #fff; font-family: Kanit, sans-serif; overflow: hidden; }
+    html, body { margin: 0; height: 100%; background: #120c1c; color: #f3e9f7; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
     #ui { position: fixed; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
-    #ui div { display: flex; gap: 6px; flex-wrap: wrap; }
-    button { font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid #ff7eb6; border-radius: 8px; background: #2a1830; color: #ffd0e2; cursor: pointer; }
-    button.on { background: #ff7eb6; color: #2a1020; }
-    #info { font-size: 12px; opacity: 0.7; }
+    #ui div { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    button { font: inherit; padding: 4px 10px; border: 1px solid #6d4a78; border-radius: 4px; background: #1e1426; color: #f3e9f7; cursor: pointer; }
+    button.on { background: #f3e9f7; color: #1e1426; border-color: #f3e9f7; }
+    #info { opacity: 0.6; }
+    body.light { background: #fff; color: #222; }
+    body.light button { background: #fff; color: #333; border-color: #bbb; }
+    body.light button.on { background: #333; color: #fff; }
   </style>
 </head>
 <body>
   <div id="ui">
     <div id="expr"></div>
     <div id="pose"></div>
-    <div><button id="ghost">ghost</button><button id="spin">spin</button>
+    <div><button id="ghost">ghost</button><button id="spin">spin</button><button id="lights">game light</button>
       <label>glow <input id="glow" type="range" min="0" max="1" step="0.05" value="0"></label></div>
     <div id="info"></div>
   </div>
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
     import { buildPeachi, buildHeadphonesItem } from './js/peachi/model.js';
     import { EXPRESSIONS } from './js/peachi/face.js';
     import { POSES } from './js/peachi/anim.js';
 
-    // URL params: ?angle=90&expr=angry&pose=reach&ghost=0&glow=0.5&zoom=face
+    // URL params: ?angle=90&expr=angry&pose=reach&ghost=0&glow=0.5&zoom=face|upper|legs|feet&bg=white&light=game&ui=0&item=0
     const q = new URLSearchParams(location.search);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.body.appendChild(renderer.domElement);
+    if (q.get('ui') === '0') document.getElementById('ui').hidden = true;
 
+    const white = q.get('bg') === 'white';
+    if (white) document.body.classList.add('light');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x120c1c);
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environmentIntensity = 0.45;
-    scene.add(new THREE.HemisphereLight(0xc9b8ff, 0x2a1030, 1.2));
-    const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(1.5, 2.5, 2.5); scene.add(key);
-    const rim = new THREE.PointLight(0xff5fa8, 3, 6); rim.position.set(-1.2, 1.4, -1.2); scene.add(rim);
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 40), new THREE.MeshStandardMaterial({ color: 0x241634, roughness: 0.9 }));
+    scene.background = new THREE.Color(white ? 0xffffff : 0x120c1c);
+
+    // studio: soft sheet-like light · game: dark room, purple fog, flashlight from the camera
+    const studio = new THREE.Group();
+    studio.add(new THREE.HemisphereLight(0xfff4fb, 0x9a8aa8, 0.85));
+    const key = new THREE.DirectionalLight(0xffffff, 1.35); key.position.set(1.2, 2.6, 2.4); studio.add(key);
+    const fill = new THREE.DirectionalLight(0xffe6f2, 0.3); fill.position.set(-2, 1.2, 1); studio.add(fill);
+    const game = new THREE.Group();
+    game.add(new THREE.HemisphereLight(0x3a2a5a, 0x0a0610, 0.5));
+    const rgb = new THREE.PointLight(0xff5fa8, 4, 6); rgb.position.set(-1.4, 1.6, -0.8); game.add(rgb);
+    const torch = new THREE.SpotLight(0xfff1dc, 26, 14, 0.42, 0.45, 1.4);
+    game.add(torch); game.add(torch.target);
+    let gameLight = q.get('light') === 'game';
+    scene.add(studio, game);
+    function applyLights() {
+      studio.visible = !gameLight; game.visible = gameLight;
+      scene.fog = gameLight ? new THREE.FogExp2(0x1a0b2e, 0.06) : null;
+      if (!white) scene.background.set(gameLight ? 0x07040c : 0x120c1c);
+    }
+    applyLights();
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 48), new THREE.MeshStandardMaterial({ color: white ? 0xeeeaf2 : 0x241634, roughness: 0.9 }));
     floor.rotation.x = -Math.PI / 2; scene.add(floor);
 
-    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 50);
+    const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 50);
     const controls = new OrbitControls(camera, renderer.domElement);
-    if (q.get('zoom') === 'face') { camera.position.set(0, 1.3, 1.1); controls.target.set(0, 1.28, 0); }
-    else { camera.position.set(0.4, 1.05, 2.9); controls.target.set(0.2, 0.8, 0); }
+    const VIEWS = {
+      body: [[0, 0.86, 3.35], [0, 0.82, 0]],
+      face: [[0, 1.45, 0.62], [0, 1.44, 0]],
+      upper: [[0, 1.2, 1.55], [0, 1.16, 0]],
+      legs: [[0, 0.5, 1.9], [0, 0.45, 0]],
+      feet: [[0, 0.2, 0.9], [0, 0.1, 0]],
+    };
+    const [cp, ct] = VIEWS[q.get('zoom')] || VIEWS.body;
+    camera.position.set(...cp); controls.target.set(...ct);
     controls.update();
 
     let ghost = q.get('ghost') !== '0';
@@ -77,7 +103,8 @@
     }
 
     const item = buildHeadphonesItem();
-    item.position.set(0.8, 0, 0.1); scene.add(item);
+    item.position.set(0.75, 0, 0.2);
+    if (q.get('item') !== '0') scene.add(item);
 
     const $ = (id) => document.getElementById(id);
     function buttons(el, names, onClick) {
@@ -87,15 +114,16 @@
     buttons($('pose'), POSES, (n) => { pose = n; peachi.setPose(n); });
     $('ghost').onclick = () => { ghost = !ghost; rebuild(); };
     $('spin').onclick = () => { spin = !spin; refresh(); };
+    $('lights').onclick = () => { gameLight = !gameLight; applyLights(); refresh(); };
     $('glow').value = glow;
     $('glow').oninput = (e) => { glow = Number(e.target.value); peachi.setGlow(glow); };
     function refresh() {
       document.querySelectorAll('#expr button').forEach((b) => b.classList.toggle('on', b.dataset.n === expr));
       document.querySelectorAll('#pose button').forEach((b) => b.classList.toggle('on', b.dataset.n === pose));
-      $('ghost').classList.toggle('on', ghost); $('spin').classList.toggle('on', spin);
-      let tris = 0;
-      peachi.group.traverse((o) => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
-      $('info').textContent = `model tris: ${Math.round(tris)} · drag to orbit`;
+      $('ghost').classList.toggle('on', ghost); $('spin').classList.toggle('on', spin); $('lights').classList.toggle('on', gameLight);
+      let tris = 0, calls = 0;
+      peachi.group.traverse((o) => { if (o.isMesh) { calls++; tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; } });
+      $('info').textContent = `${Math.round(tris)} tris (incl. outlines) · ${calls} meshes · drag to orbit`;
     }
     rebuild();
 
@@ -111,8 +139,11 @@
       peachi.update(dt, t);
       item.userData.update(dt, t);
       controls.update();
+      torch.position.copy(camera.position);
+      torch.target.position.copy(controls.target);
       renderer.render(scene, camera);
     });
+    window.__peachi = () => peachi;
   </script>
 </body>
 </html>
