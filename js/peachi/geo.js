@@ -217,6 +217,22 @@ export function place(g, pos = [0, 0, 0], rot = [0, 0, 0], scale = 1) {
   return g;
 }
 
+// Line color per vertex: the base color darkened and a little more saturated (anime line art);
+// neutral colors (white cloth, black straps) get a purple-grey line.
+const _hsl = { h: 0, s: 0, l: 0 };
+function outlineColors(colorAttr) {
+  const n = colorAttr.count, out = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    _col.setRGB(colorAttr.getX(i), colorAttr.getY(i), colorAttr.getZ(i));
+    _col.getHSL(_hsl);
+    let { h, s, l } = _hsl;
+    if (s < 0.12) { h = 0.74; s = 0.28; }
+    _col.setHSL(h, Math.min(1, s * 1.2 + 0.08), Math.min(l * 0.3, 0.075));
+    out[i * 3] = _col.r; out[i * 3 + 1] = _col.g; out[i * 3 + 2] = _col.b;
+  }
+  return new THREE.BufferAttribute(out, 3);
+}
+
 /**
  * Collects geometry pieces per (bone group, material key), then merges them into one mesh per bin
  * plus one inverted-hull outline mesh per group.
@@ -253,6 +269,7 @@ export class PartBin {
           const o = new THREE.BufferGeometry();
           o.setAttribute('position', geo.attributes.position.clone());
           o.setAttribute('aSway', geo.attributes.aSway.clone());
+          o.setAttribute('aOLC', outlineColors(geo.attributes.color));
           o.setIndex(geo.index.clone());
           const m = mergeVertices(o, 1e-5);
           m.computeVertexNormals();

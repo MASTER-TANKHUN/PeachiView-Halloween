@@ -281,10 +281,20 @@ function drawTears(ctx) {
 }
 
 /** Paint a face on a 2D context (1024² space; `size` scales it). */
-export function drawFace(ctx, name = 'happy', { blink = false, size = S } = {}) {
+export function drawFace(ctx, name = 'happy', { blink = false, size = S, eyesOnly = false } = {}) {
   ctx.save();
   ctx.clearRect(0, 0, size, size);
   ctx.scale(size / S, size / S);
+  if (eyesOnly) { // overlay drawn through the bangs: just brows + eyes
+    const kind = { cry: 'worried', angry: 'angry', scream: 'raised' }[name] || 'soft';
+    const eo = name === 'cry' ? { sad: true, open: 0.9, teary: true, irisDy: 0.16 }
+      : name === 'angry' ? { glare: true, angry: true, iris: 0.92, pupil: 0.8, irisDy: 0.2 }
+        : name === 'scream' ? { wide: true, iris: 0.62, pupil: 0.5, irisDy: 0.02 } : {};
+    drawBrow(ctx, -1, kind); drawBrow(ctx, 1, kind);
+    for (const sd of [-1, 1]) drawEye(ctx, sd, { ...eo, closed: blink && name !== 'scream' });
+    ctx.restore();
+    return;
+  }
   // soft hair shadow on the forehead, under the bangs
   const hs = ctx.createLinearGradient(0, 0, 0, BROW_Y + 30);
   hs.addColorStop(0, 'rgba(196,108,112,0.45)'); hs.addColorStop(0.7, 'rgba(206,122,124,0.2)'); hs.addColorStop(1, 'rgba(206,122,124,0)');
@@ -343,7 +353,46 @@ export function makeAngerMarkTexture() {
   return t;
 }
 
-/** Face controller: owns the canvas + texture, redraws on expression change and blinks. */
+/**
+ * SDF face-shadow map (Genshin/Star Rail technique), generated instead of hand-painted.
+ * Value v per texel = how far the light may swing away from the front before this texel falls into
+ * shadow: lit while (F·L)*0.5+0.5 ≥ 1 − v. Authored for a light on her left (+x); the shader mirrors u.
+ * Proxy: a flattened face (stays lit for moderate side angles), a jaw that narrows toward the chin, and a
+ * small nose-shadow wedge that appears once the light is ~45° to the side.
+ */
+export function createFaceSDF(N = 256, faceHalfWidth = null) {
+  const c = document.createElement('canvas'); c.width = c.height = N;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(N, N);
+  const { x0, x1, y0, y1 } = FACE_WINDOW;
+  const inTri = (px, py, a, b, d) => {
+    const s1 = (b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0]);
+    const s2 = (d[0] - b[0]) * (py - b[1]) - (d[1] - b[1]) * (px - b[0]);
+    const s3 = (a[0] - d[0]) * (py - d[1]) - (a[1] - d[1]) * (px - d[0]);
+    return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0);
+  };
+  for (let j = 0; j < N; j++) {
+    const y = y0 + (1 - (j + 0.5) / N) * (y1 - y0);
+    const halfW = Math.max(0.012, faceHalfWidth ? faceHalfWidth(y) : 0.062);
+    for (let i = 0; i < N; i++) {
+      const x = x0 + ((i + 0.5) / N) * (x1 - x0);
+      const xn = Math.max(-1.3, Math.min(1.3, x / halfW));
+      const nz = Math.sqrt(Math.max(0, 1 - Math.min(1, xn * xn)));
+      const phic = Math.atan2(Math.pow(nz, 0.5) * 1.3, -xn);
+      let v = (1 - Math.cos(phic)) / 2;
+      if (inTri(x, y, [0.0015, 1.431], [-0.012, 1.419], [0.0005, 1.413])) v = Math.min(v, 0.16);
+      const k = (j * N + i) * 4;
+      img.data[k] = img.data[k + 1] = img.data[k + 2] = Math.round(v * 255); img.data[k + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  t.generateMipmaps = false; t.minFilter = THREE.LinearFilter;
+  return t;
+}
+
+/** Face controller: owns the face + eyes-overlay canvases/textures, redraws on expression change and blinks. */
 export function createFace() {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = S;
@@ -351,13 +400,21 @@ export function createFace() {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
+  const oCanvas = document.createElement('canvas');
+  oCanvas.width = oCanvas.height = S / 2;
+  const octx = oCanvas.getContext('2d');
+  const overlayTexture = new THREE.CanvasTexture(oCanvas);
+  overlayTexture.colorSpace = THREE.SRGBColorSpace;
   let expression = 'happy', blinking = false, nextBlink = 2 + Math.random() * 3, blinkEnd = 0;
 
-  function redraw() { drawFace(ctx, expression, { blink: blinking }); texture.needsUpdate = true; }
+  function redraw() {
+    drawFace(ctx, expression, { blink: blinking }); texture.needsUpdate = true;
+    drawFace(octx, expression, { blink: blinking, size: S / 2, eyesOnly: true }); overlayTexture.needsUpdate = true;
+  }
   redraw();
 
   return {
-    canvas, texture,
+    canvas, texture, overlayTexture,
     get expression() { return expression; },
     setExpression(name) {
       if (!EXPRESSIONS.includes(name)) name = 'happy';
@@ -369,6 +426,6 @@ export function createFace() {
       if (!blinking && t >= nextBlink) { blinking = true; blinkEnd = t + 0.12; redraw(); }
       else if (blinking && t >= blinkEnd) { blinking = false; nextBlink = t + 2.2 + Math.random() * 3.5; redraw(); }
     },
-    dispose() { texture.dispose(); },
+    dispose() { texture.dispose(); overlayTexture.dispose(); },
   };
 }

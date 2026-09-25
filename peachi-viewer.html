@@ -39,7 +39,7 @@
     import { EXPRESSIONS } from './js/peachi/face.js';
     import { POSES } from './js/peachi/anim.js';
 
-    // URL params: ?angle=90&expr=angry&pose=reach&ghost=0&glow=0.5&zoom=face|upper|legs|feet&bg=white&light=game&ui=0&item=0
+    // URL params: ?angle=90&expr=angry&pose=reach&ghost=0&glow=0.5&zoom=face|upper|legs|feet&bg=white&light=game&keyaz=60&ui=0&item=0&hide=hair,outline
     const q = new URLSearchParams(location.search);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -56,8 +56,9 @@
 
     // studio: soft sheet-like light · game: dark room, purple fog, flashlight from the camera
     const studio = new THREE.Group();
-    studio.add(new THREE.HemisphereLight(0xffffff, 0xd8cce6, 0.45));
+    studio.add(new THREE.HemisphereLight(0xffffff, 0xd8cce6, 0.18));
     const key = new THREE.DirectionalLight(0xffffff, Math.PI); key.position.set(0.9, 2.4, 3.0); studio.add(key);
+    if (q.has('keyaz')) { const a = THREE.MathUtils.degToRad(Number(q.get('keyaz'))); key.position.set(Math.sin(a) * 3, 1.6, Math.cos(a) * 3); } // light angle around her
     const game = new THREE.Group();
     game.add(new THREE.HemisphereLight(0x3a2a5a, 0x0a0610, 0.5));
     const rgb = new THREE.PointLight(0xff5fa8, 4, 6); rgb.position.set(-1.4, 1.6, -0.8); game.add(rgb);

@@ -7,8 +7,8 @@ import {
   heartGeo, roundRectShape, extrude, tint, atlasUV, setSway, place, normalize, PartBin,
 } from './geo.js';
 import { createAtlas } from './textures.js';
-import { createUniforms, toonMaterial, outlineMaterial, SHADE } from './materials.js';
-import { createFace, makeAngerMarkTexture, FACE_WINDOW } from './face.js';
+import { createUniforms, toonMaterial, outlineMaterial, SHADE, TERM } from './materials.js';
+import { createFace, createFaceSDF, makeAngerMarkTexture, FACE_WINDOW } from './face.js';
 import { createAnimator } from './anim.js';
 
 const PI = Math.PI, DEG = PI / 180;
@@ -84,20 +84,41 @@ function jacketPoint(th, y, off, out) {
   return out.set((rx + off) * s * fold, y, -0.012 + ((c >= 0 ? rzF : rzB) + off) * c * fold);
 }
 
-// anime head: sphere with a tapered jaw, flat face plane and tucked nape
+// Anime head built from horizontal rings (world Y), tuned to the sheet's face measured in eye spacings
+// E (0.069 m): face half-width 0.91E at the eyes, 0.76E at the cheeks, 0.63E at the mouth, 0.31E just
+// below it, then a short rounded chin 1.18E under the eye line (a U/V-line jaw, not a long triangle).
+// Wf = half-width of the face (front half), Wb = half-width of the skull behind it (hidden by hair/cups),
+// zF / zB = frontmost / rearmost z of the ring.
+const HEAD_RINGS = [
+  { k: 1.366, Wf: 0.0, Wb: 0.0, zF: 0.052, zB: 0.04 },
+  { k: 1.369, Wf: 0.008, Wb: 0.011, zF: 0.061, zB: 0.022 },
+  { k: 1.376, Wf: 0.02, Wb: 0.026, zF: 0.069, zB: -0.004 },
+  { k: 1.386, Wf: 0.033, Wb: 0.042, zF: 0.077, zB: -0.034 },
+  { k: 1.4, Wf: 0.0445, Wb: 0.056, zF: 0.083, zB: -0.058 },
+  { k: 1.422, Wf: 0.0535, Wb: 0.068, zF: 0.087, zB: -0.08 },
+  { k: 1.447, Wf: 0.062, Wb: 0.076, zF: 0.089, zB: -0.092 },
+  { k: 1.475, Wf: 0.069, Wb: 0.079, zF: 0.089, zB: -0.098 },
+  { k: 1.505, Wf: 0.073, Wb: 0.079, zF: 0.086, zB: -0.098 },
+  { k: 1.535, Wf: 0.069, Wb: 0.074, zF: 0.077, zB: -0.09 },
+  { k: 1.56, Wf: 0.055, Wb: 0.06, zF: 0.061, zB: -0.074 },
+  { k: 1.577, Wf: 0.031, Wb: 0.034, zF: 0.034, zB: -0.046 },
+  { k: 1.585, Wf: 0.0, Wb: 0.0, zF: -0.006, zB: -0.012 },
+];
+const _hr = {};
+export const faceHalfWidth = (y) => (y <= 1.366 ? 0 : tableLerp(HEAD_RINGS, Math.min(1.585, y), _hr).Wf);
+// v (0 top … 1 chin) → height; the upper half keeps the old spherical spacing so hair placement by
+// polar angle stays where it was designed
+const headY = (v) => (v <= 0.5 ? HC.y + 0.1 * Math.cos(PI * v) : HC.y - (HC.y - 1.366) * Math.sin(PI * (v - 0.5)));
 function headPoint(u, v, o) {
-  const az = PI + TAU * u, p = PI * v;
-  let x = Math.sin(p) * Math.sin(az), y = Math.cos(p), z = Math.sin(p) * Math.cos(az);
-  if (y < 0) {
-    const t = -y, front = smooth(-0.2, 0.9, z);
-    x *= (1 - 0.1 * smooth(0.05, 0.45, t)) * (1 - 0.5 * Math.pow(t, 1.3) * (0.6 + 0.4 * front));
-    y *= 1 + 0.47 * t * front;
-    if (z > 0) z = z * (1 - 0.2 * t * t) + 0.05 * t * front;
-    else { z *= 1 - 0.42 * t; y *= 1 - 0.12 * t; }
-  }
-  if (z > 0.5) z = 0.5 + (z - 0.5) * 0.78;
-  x *= 1 + 0.05 * Math.exp(-(((y + 0.35) / 0.3) ** 2)) * (z > 0 ? 1 : 0.3);
-  return o.set(x * 0.079, y * 0.1, z * 0.092).add(HC);
+  const th = PI + TAU * u, y = headY(Math.min(1, Math.max(0, v)));
+  const R = tableLerp(HEAD_RINGS, y, _hr);
+  const s = Math.sin(th), c = Math.cos(th);
+  const W = lerp(R.Wb, R.Wf, smooth(-0.35, 0.35, c));
+  const x = W * s;
+  // flat anime face plane in front, round skull behind
+  let z = c >= 0 ? R.zF * c * (1 + 0.35 * (1 - c)) : -R.zB * c;
+  z += 0.006 * Math.exp(-((x / 0.0065) ** 2)) * Math.exp(-(((y - 1.428) / 0.011) ** 2)) * smooth(0.8, 1, c); // small nose
+  return o.set(x, y, z + HC.z);
 }
 const _hd = V();
 function headAt(az, pol, off, out = V()) {
@@ -208,10 +229,15 @@ export function buildPeachi({ ghost = true } = {}) {
   const U = createUniforms(ghost);
   const atlas = createAtlas();
   const face = createFace();
+  const faceSDF = createFaceSDF(256, faceHalfWidth);
+  U.uFaceSDF.value = faceSDF;
+  U.uFaceWin.value.set(FACE_WINDOW.x0 - HEAD_O.x, FACE_WINDOW.y0 - HEAD_O.y, FACE_WINDOW.x1 - HEAD_O.x, FACE_WINDOW.y1 - HEAD_O.y);
+  U.uFaceZ.value = HC.z - HEAD_O.z;
 
   const M = {
     solid: toonMaterial(U, { vertexColors: true, side: THREE.DoubleSide }, { shade: SHADE.cloth }),
-    skin: toonMaterial(U, { vertexColors: true }, { shade: SHADE.skin }),
+    skin: toonMaterial(U, { vertexColors: true }, { shade: SHADE.skin, term: TERM.skin }),
+    faceSkin: toonMaterial(U, { vertexColors: true }, { shade: SHADE.face, term: TERM.skin, faceSDF: true }),
     hair: toonMaterial(U, { vertexColors: true, side: THREE.DoubleSide }, { shade: SHADE.warm, strands: true }),
     holo: toonMaterial(U, { vertexColors: true, map: atlas.texture, side: THREE.DoubleSide }, { holo: true, lining: true, shade: SHADE.cloth }),
     print: toonMaterial(U, { vertexColors: true, map: atlas.texture, alphaTest: 0.5, side: THREE.DoubleSide }, { shade: SHADE.cloth }),
@@ -219,7 +245,11 @@ export function buildPeachi({ ghost = true } = {}) {
     face: toonMaterial(U, {
       map: face.texture, transparent: true, depthWrite: false, emissive: 0xffffff, emissiveMap: face.texture, emissiveIntensity: 0.16,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
-    }, { rim: false, shade: SHADE.skin }),
+    }, { rim: false, crisp: false, shade: SHADE.face, faceSDF: true }),
+    // Star Rail-style see-through bangs: eyes + brows drawn again, half-transparent, over hair right in front
+    eyes: toonMaterial(U, {
+      map: face.overlayTexture, transparent: true, depthWrite: false, emissive: 0xffffff, emissiveMap: face.overlayTexture, emissiveIntensity: 0.16,
+    }, { rim: false, crisp: false, shade: SHADE.face, faceSDF: true, eyeOverlay: true }),
   };
   const outline = outlineMaterial(U);
 
@@ -252,7 +282,7 @@ export function buildPeachi({ ghost = true } = {}) {
   const _p = V();
 
   // =================================================================== head
-  W(head, 'skin', surface(headPoint, 40, 30, { color: C.skin, flip: true }));
+  W(head, 'faceSkin', surface(headPoint, 40, 30, { color: C.skin, flip: true }), { outline: 0.8 });
   { // face decal: same surface, planar-projected UVs from the front
     const fw = FACE_WINDOW;
     const g = surface((u, v, o) => {
@@ -261,7 +291,9 @@ export function buildPeachi({ ghost = true } = {}) {
     }, 22, 22, { flip: true });
     const pos = g.attributes.position, uv = g.attributes.uv;
     for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) - fw.x0) / (fw.x1 - fw.x0), (pos.getY(i) - fw.y0) / (fw.y1 - fw.y0));
+    const eyes = g.clone();
     W(head, 'face', g, { outline: 0 });
+    W(head, 'eyes', eyes, { outline: 0 });
   }
   // ---- hair: scalp shell
   {
@@ -710,6 +742,9 @@ export function buildPeachi({ ghost = true } = {}) {
     update(dt, t) {
       animator.update(dt, t);
       face.update(dt, t);
+      const he = head.matrixWorld.elements; // head frame for the face shading (one frame behind is fine)
+      U.uHeadUp.value.set(he[4], he[5], he[6]).normalize();
+      U.uHeadFwd.value.set(he[8], he[9], he[10]).normalize();
       U.uTime.value = t;
       U.uBaseY.value = group.matrixWorld.elements[13];
       _s.setFromMatrixScale(group.matrixWorld);
@@ -719,7 +754,7 @@ export function buildPeachi({ ghost = true } = {}) {
     dispose() {
       group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
       Object.values(M).forEach((m) => m.dispose()); outline.dispose();
-      atlas.dispose(); face.dispose(); angerTex.dispose(); anger.material.dispose();
+      atlas.dispose(); face.dispose(); faceSDF.dispose(); angerTex.dispose(); anger.material.dispose();
     },
   };
   model.setExpression('happy');
