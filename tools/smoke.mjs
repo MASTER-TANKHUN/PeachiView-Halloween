@@ -12,7 +12,7 @@ catch { playwright = require(join(process.execPath, '../../lib/node_modules/play
 
 const [page = 'index.html', out = '/tmp/shot.png', waitMs = '3000', clickSel] = process.argv.slice(2);
 const root = resolve(new URL('..', import.meta.url).pathname);
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.json': 'application/json' };
 
 const server = createServer(async (req, res) => {
   try {

@@ -207,7 +207,7 @@ export function toonMaterial(U, params = {}, flags = {}) {
         ${eyeOverlay ? `{
           // only while she faces the camera (fades out toward profile, like Star Rail's see-through bangs)
           float facing = dot(pvHeadFwd(), normalize(vViewPosition));
-          gl_FragColor.a *= 0.55 * smoothstep(0.5, 0.82, facing);
+          gl_FragColor.a *= 0.8 * smoothstep(0.5, 0.82, facing);
         }` : ''}`);
   };
   const key = `peachi-toon4-${[holo, lining, rim, crisp, strands, faceSDF, eyeOverlay].map(Number).join('')}`;

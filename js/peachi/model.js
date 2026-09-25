@@ -8,7 +8,7 @@ import {
 } from './geo.js';
 import { createAtlas } from './textures.js';
 import { createUniforms, toonMaterial, outlineMaterial, SHADE, TERM } from './materials.js';
-import { createFace, createFaceSDF, makeAngerMarkTexture, FACE_WINDOW } from './face.js';
+import { createFace, createFaceSDF, makeAngerMarkTexture, FACE_WINDOW, SKIN_ART } from './face.js';
 import { createAnimator } from './anim.js';
 
 const PI = Math.PI, DEG = PI / 180;
@@ -16,10 +16,10 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 // ---------------------------------------------------------------- palette (sRGB, sampled from the sheet)
 const C = {
-  skin: 0xf6c8b2, navel: 0xd99684, white: 0xfbf8fd, lav: 0xece6fb, pink: 0xff8cbf, pinkDeep: 0xef5f9f,
+  skin: SKIN_ART, navel: 0xde9a92, white: 0xfbf8fd, lav: 0xece6fb, pink: 0xff8cbf, pinkDeep: 0xef5f9f,
   pinkPale: 0xffd0e4, coral: 0xf2566f, ink: 0x221f30, inkSoft: 0x2e2a42, gold: 0xebbd52, sock: 0x221f2d,
 };
-const HAIR = ['#55261c', '#733224', '#8f3b2c', '#bb5060', '#e8718f', '#f59cba'].map((c) => new THREE.Color(c));
+const HAIR = ['#431c15', '#5f261d', '#833226', '#b84b5a', '#e8718f', '#f59cba'].map((c) => new THREE.Color(c));
 const _hc = new THREE.Color(), _ring = new THREE.Color('#9b5a4a');
 
 /** Hair color by height (the sheet's gradient is dark brown at the crown → pink below the chest). */
@@ -90,11 +90,12 @@ function jacketPoint(th, y, off, out) {
 // Wf = half-width of the face (front half), Wb = half-width of the skull behind it (hidden by hair/cups),
 // zF / zB = frontmost / rearmost z of the ring.
 const HEAD_RINGS = [
-  { k: 1.366, Wf: 0.0, Wb: 0.0, zF: 0.052, zB: 0.04 },
-  { k: 1.369, Wf: 0.008, Wb: 0.011, zF: 0.061, zB: 0.022 },
-  { k: 1.376, Wf: 0.02, Wb: 0.026, zF: 0.069, zB: -0.004 },
-  { k: 1.386, Wf: 0.033, Wb: 0.042, zF: 0.077, zB: -0.034 },
-  { k: 1.4, Wf: 0.0445, Wb: 0.056, zF: 0.083, zB: -0.058 },
+  { k: 1.3635, Wf: 0.0, Wb: 0.0, zF: 0.052, zB: 0.04 },
+  { k: 1.369, Wf: 0.009, Wb: 0.012, zF: 0.061, zB: 0.022 },
+  { k: 1.376, Wf: 0.022, Wb: 0.028, zF: 0.069, zB: -0.004 },
+  { k: 1.386, Wf: 0.0365, Wb: 0.045, zF: 0.077, zB: -0.034 },
+  { k: 1.4, Wf: 0.047, Wb: 0.057, zF: 0.083, zB: -0.058 },
+  { k: 1.41, Wf: 0.05, Wb: 0.063, zF: 0.085, zB: -0.07 },
   { k: 1.422, Wf: 0.0535, Wb: 0.068, zF: 0.087, zB: -0.08 },
   { k: 1.447, Wf: 0.062, Wb: 0.076, zF: 0.089, zB: -0.092 },
   { k: 1.475, Wf: 0.069, Wb: 0.079, zF: 0.089, zB: -0.098 },
@@ -105,10 +106,10 @@ const HEAD_RINGS = [
   { k: 1.585, Wf: 0.0, Wb: 0.0, zF: -0.006, zB: -0.012 },
 ];
 const _hr = {};
-export const faceHalfWidth = (y) => (y <= 1.366 ? 0 : tableLerp(HEAD_RINGS, Math.min(1.585, y), _hr).Wf);
+export const faceHalfWidth = (y) => (y <= 1.3635 ? 0 : tableLerp(HEAD_RINGS, Math.min(1.585, y), _hr).Wf);
 // v (0 top … 1 chin) → height; the upper half keeps the old spherical spacing so hair placement by
 // polar angle stays where it was designed
-const headY = (v) => (v <= 0.5 ? HC.y + 0.1 * Math.cos(PI * v) : HC.y - (HC.y - 1.366) * Math.sin(PI * (v - 0.5)));
+const headY = (v) => (v <= 0.5 ? HC.y + 0.1 * Math.cos(PI * v) : HC.y - (HC.y - 1.3635) * Math.sin(PI * (v - 0.5)));
 function headPoint(u, v, o) {
   const th = PI + TAU * u, y = headY(Math.min(1, Math.max(0, v)));
   const R = tableLerp(HEAD_RINGS, y, _hr);
@@ -243,13 +244,13 @@ export function buildPeachi({ ghost = true } = {}) {
     print: toonMaterial(U, { vertexColors: true, map: atlas.texture, alphaTest: 0.5, side: THREE.DoubleSide }, { shade: SHADE.cloth }),
     led: toonMaterial(U, { vertexColors: true, emissive: 0xff9ad0, emissiveIntensity: 0.75 }, { rim: false }),
     face: toonMaterial(U, {
-      map: face.texture, transparent: true, depthWrite: false, emissive: 0xffffff, emissiveMap: face.texture, emissiveIntensity: 0.16,
+      map: face.texture, transparent: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
-    }, { rim: false, crisp: false, shade: SHADE.face, faceSDF: true }),
+    }, { rim: false, crisp: false, shade: SHADE.face, term: TERM.skin, faceSDF: true }),
     // Star Rail-style see-through bangs: eyes + brows drawn again, half-transparent, over hair right in front
     eyes: toonMaterial(U, {
-      map: face.overlayTexture, transparent: true, depthWrite: false, emissive: 0xffffff, emissiveMap: face.overlayTexture, emissiveIntensity: 0.16,
-    }, { rim: false, crisp: false, shade: SHADE.face, faceSDF: true, eyeOverlay: true }),
+      map: face.overlayTexture, transparent: true, depthWrite: false,
+    }, { rim: false, crisp: false, shade: SHADE.face, term: TERM.skin, faceSDF: true, eyeOverlay: true }),
   };
   const outline = outlineMaterial(U);
 
@@ -286,9 +287,9 @@ export function buildPeachi({ ghost = true } = {}) {
   { // face decal: same surface, planar-projected UVs from the front
     const fw = FACE_WINDOW;
     const g = surface((u, v, o) => {
-      headPoint(lerp(0.3, 0.7, u), lerp(0.28, 0.86, v), o);
+      headPoint(lerp(0.28, 0.72, u), lerp(0.28, 0.985, v), o);
       _hd.copy(o).sub(HC).multiplyScalar(0.004); o.add(_hd);
-    }, 22, 22, { flip: true });
+    }, 24, 28, { flip: true });
     const pos = g.attributes.position, uv = g.attributes.uv;
     for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) - fw.x0) / (fw.x1 - fw.x0), (pos.getY(i) - fw.y0) / (fw.y1 - fw.y0));
     const eyes = g.clone();
@@ -339,8 +340,8 @@ export function buildPeachi({ ghost = true } = {}) {
     }, 16, 6, { flip: true, color: (u, v, p, c) => hairColorAt(p.y, c).multiplyScalar(0.8) });
     W(head, 'hair', g, { outline: 0 });
   }
-  const BANGS = [[-74, 0.73, 0.013], [-61, 0.62, 0.022], [-47, 0.572, 0.036], [-34, 0.552, 0.036], [-22, 0.562, 0.036], [-10, 0.55, 0.036],
-    [2, 0.6, 0.013], [12, 0.55, 0.036], [25, 0.56, 0.036], [37, 0.548, 0.036], [49, 0.566, 0.036], [61, 0.62, 0.022], [74, 0.73, 0.013]];
+  const BANGS = [[-74, 0.73, 0.013], [-61, 0.61, 0.022], [-47, 0.56, 0.034], [-34, 0.54, 0.034], [-22, 0.548, 0.034], [-10, 0.535, 0.034],
+    [2, 0.59, 0.012], [12, 0.535, 0.034], [25, 0.546, 0.034], [37, 0.536, 0.034], [49, 0.553, 0.034], [61, 0.61, 0.022], [74, 0.73, 0.013]];
   BANGS.forEach(([deg, end, w], i) => {
     const az = deg * DEG, off = i % 2 ? 0.0135 : 0.0115;
     hairPiece([

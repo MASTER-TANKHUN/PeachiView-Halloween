@@ -392,6 +392,45 @@ export function createFaceSDF(N = 256, faceHalfWidth = null) {
   return t;
 }
 
+// ---------------------------------------------------------------- the character sheet's own face art
+// assets/peachi/face_<expression>.webp are cut from Character_Sheet_1_Peachi.png by
+// tools/extract_face_art.py, already aligned to this canvas (eye centers at ±EYE_DX, EYE_Y).
+export const SKIN_ART = '#fccbc5'; // cheek color of the drawn face (the 3D skin uses the same)
+const art = {}, artWaiters = new Set();
+let artRequested = false;
+function requestArt() {
+  if (artRequested || typeof Image === 'undefined') return;
+  artRequested = true;
+  for (const name of EXPRESSIONS) {
+    const img = new Image();
+    img.onload = () => { art[name] = img; for (const fn of artWaiters) fn(name); };
+    img.src = new URL(`../../assets/peachi/face_${name}.webp`, import.meta.url).href;
+  }
+}
+// blink on top of the drawn face: skin over the open eye, then a closed lash line
+function drawArtBlink(ctx) {
+  for (const side of [-1, 1]) {
+    const cx = CX + side * EYE_DX, cy = EYE_Y + 6;
+    ctx.save();
+    ctx.translate(cx, cy); ctx.scale(1, 0.76);
+    const g = ctx.createRadialGradient(0, 0, 90, 0, 0, 160);
+    g.addColorStop(0, SKIN_ART); g.addColorStop(0.8, SKIN_ART); g.addColorStop(1, 'rgba(252,203,197,0)');
+    ctx.fillStyle = g; ell(ctx, 0, 0, 160, 160); ctx.fill();
+    ctx.restore();
+    drawEye(ctx, side, { closed: true });
+  }
+}
+function eyesOnlyMask(ctx, scale) { // keep only the two eye regions (feathered), for the see-through overlay
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  for (const side of [-1, 1]) ctx.ellipse((CX + side * EYE_DX) * scale, (EYE_Y + 4) * scale, 150 * scale, 108 * scale, 0, 0, Math.PI * 2);
+  ctx.filter = `blur(${3 * scale}px)`;
+  ctx.fill();
+  ctx.restore();
+}
+
 /** Face controller: owns the face + eyes-overlay canvases/textures, redraws on expression change and blinks. */
 export function createFace() {
   const canvas = document.createElement('canvas');
@@ -408,9 +447,21 @@ export function createFace() {
   let expression = 'happy', blinking = false, nextBlink = 2 + Math.random() * 3, blinkEnd = 0;
 
   function redraw() {
-    drawFace(ctx, expression, { blink: blinking }); texture.needsUpdate = true;
-    drawFace(octx, expression, { blink: blinking, size: S / 2, eyesOnly: true }); overlayTexture.needsUpdate = true;
+    const img = art[expression];
+    if (img) {
+      ctx.clearRect(0, 0, S, S); ctx.drawImage(img, 0, 0, S, S);
+      if (blinking) drawArtBlink(ctx);
+      octx.clearRect(0, 0, S / 2, S / 2);
+      if (!blinking) { octx.drawImage(img, 0, 0, S / 2, S / 2); eyesOnlyMask(octx, 0.5); }
+    } else { // until the art has loaded: the painted fallback face
+      drawFace(ctx, expression, { blink: blinking });
+      drawFace(octx, expression, { blink: blinking, size: S / 2, eyesOnly: true });
+    }
+    texture.needsUpdate = true; overlayTexture.needsUpdate = true;
   }
+  const onArt = (name) => { if (name === expression) redraw(); };
+  artWaiters.add(onArt);
+  requestArt();
   redraw();
 
   return {
@@ -426,6 +477,6 @@ export function createFace() {
       if (!blinking && t >= nextBlink) { blinking = true; blinkEnd = t + 0.12; redraw(); }
       else if (blinking && t >= blinkEnd) { blinking = false; nextBlink = t + 2.2 + Math.random() * 3.5; redraw(); }
     },
-    dispose() { texture.dispose(); overlayTexture.dispose(); },
+    dispose() { artWaiters.delete(onArt); texture.dispose(); overlayTexture.dispose(); },
   };
 }
