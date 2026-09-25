@@ -9,10 +9,10 @@ export const POSES = ['idle', 'float', 'reach', 'jumpscare'];
 // wrist = hands flared outward, legSwing = thighs forward, knee = shin bend back, foot = toes down,
 // flare = hair/skirt lift, sway = hair/skirt sway energy, shake = jitter.
 const TARGETS = {
-  idle:      { hover: 0.08, bobAmp: 0.02, bobSpd: 1.6, lean: 0.00, lunge: 0.00, armPitch: 0.03, armSpread: 0.36, elbow: 0.16, wrist: 0.3, headTilt: 0.06, headPitch: 0.03, headScale: 1.0, legSwing: 0.06, knee: 0.14, foot: 0.3, flare: 0.00, sway: 1.0, shake: 0 },
+  idle:      { hover: 0.08, bobAmp: 0.02, bobSpd: 1.6, lean: 0.00, lunge: 0.00, armPitch: 0.03, armSpread: 0.48, elbow: 0.16, wrist: 0.3, headTilt: 0.06, headPitch: 0.03, headScale: 1.0, legSwing: 0.06, knee: 0.14, foot: 0.3, flare: 0.00, sway: 1.0, shake: 0 },
   float:     { hover: 0.26, bobAmp: 0.05, bobSpd: 1.1, lean: 0.05, lunge: 0.00, armPitch: -0.2, armSpread: 0.72, elbow: 0.42, wrist: 0.45, headTilt: -0.12, headPitch: -0.04, headScale: 1.0, legSwing: 0.16, knee: 0.55, foot: 0.55, flare: 0.25, sway: 1.6, shake: 0 },
   reach:     { hover: 0.12, bobAmp: 0.025, bobSpd: 2.2, lean: 0.2, lunge: 0.08, armPitch: -1.3, armSpread: 0.2, elbow: 0.12, wrist: -0.15, headTilt: 0.00, headPitch: 0.12, headScale: 1.0, legSwing: 0.25, knee: 0.45, foot: 0.45, flare: 0.3, sway: 1.8, shake: 0 },
-  jumpscare: { hover: 0.04, bobAmp: 0.00, bobSpd: 0.0, lean: 0.26, lunge: 0.22, armPitch: -2.05, armSpread: 0.62, elbow: 0.55, wrist: 0.35, headTilt: 0.32, headPitch: 0.1, headScale: 1.12, legSwing: 0.4, knee: 0.85, foot: 0.6, flare: 1.0, sway: 2.6, shake: 1 },
+  jumpscare: { hover: 0.04, bobAmp: 0.00, bobSpd: 0.0, lean: 0.26, lunge: 0.32, armPitch: -2.05, armSpread: 0.62, elbow: 0.55, wrist: 0.35, headTilt: 0.28, headPitch: 0.1, headScale: 1.25, legSwing: 0.4, knee: 0.85, foot: 0.6, flare: 1.0, sway: 2.6, shake: 1 },
 };
 
 const MOOD = { // small additive modifiers per expression
@@ -63,10 +63,10 @@ export function createAnimator(rig, { ghost = true, U } = {}) {
       const lead = l.side > 0 ? 1 : 0.6;
       const kick = grounded ? 0 : Math.sin(t * 1.2 + (l.side > 0 ? 0 : Math.PI)) * 0.07 * (hover > 0.04 ? 1 : 0);
       l.hip.rotation.x = grounded ? 0 : -cur.legSwing * lead + kick;
-      l.hip.rotation.z = l.side * 0.05;
+      l.hip.rotation.z = l.side * 0.07;
       l.knee.rotation.x = grounded ? 0 : cur.knee * (l.side > 0 ? 1 : 0.75) + kick * 0.6;
       l.ankle.rotation.x = grounded ? 0 : cur.foot;
-      l.ankle.rotation.z = -l.side * 0.05;
+      l.ankle.rotation.z = -l.side * 0.07;
     }
     if (U) {
       U.uFlare.value = cur.flare;

@@ -14,8 +14,8 @@ export function createUniforms(ghost) {
     uSelfLit: { value: ghost ? 0.2 : 0.06 },
     uFlare: { value: 0 },  // 0..1 hair/skirt lift (float, jumpscare)
     uSwayK: { value: 1 },  // sway energy
-    uShadeColor: { value: new THREE.Color(0.66, 0.54, 0.72) },
-    uShadeEdge: { value: 0.02 },
+    uShadeEdge: { value: 0.05 },
+    uLightCap: { value: 1.06 }, // lit areas never exceed albedo × cap (anime cel look, no blow-out)
     uLining: { value: new THREE.Color(0xff8dbd) },
   };
 }
@@ -54,23 +54,41 @@ const FADE_MAIN = /* glsl */`
 }
 `;
 
-const _cache = new Map();
+const HOLO_PARS = /* glsl */`
+vec3 pvHolo(float t) {
+  t = fract(t) * 4.0;
+  vec3 c0 = vec3(1.0, 0.64, 0.86), c1 = vec3(0.74, 0.7, 1.0), c2 = vec3(0.62, 0.93, 1.0), c3 = vec3(1.0, 0.95, 0.76);
+  if (t < 1.0) return mix(c0, c1, smoothstep(0.0, 1.0, t));
+  if (t < 2.0) return mix(c1, c2, smoothstep(1.0, 2.0, t));
+  if (t < 3.0) return mix(c2, c3, smoothstep(2.0, 3.0, t));
+  return mix(c3, c0, smoothstep(3.0, 4.0, t));
+}
+`;
 
 /**
  * Toon material with the Peachi injections.
- * flags: { holo, lining, rim = true, faceLit }
+ * flags: { holo, lining, rim = true, shade: shadow multiply color, strands: drawn hair lines along uv.x }
  */
+export const SHADE = {
+  cloth: new THREE.Color(0.8, 0.74, 0.93),
+  skin: new THREE.Color(0.95, 0.72, 0.7),
+  warm: new THREE.Color(0.86, 0.66, 0.74),
+};
 export function toonMaterial(U, params = {}, flags = {}) {
-  const { holo = false, lining = false, rim = true } = flags;
+  const { holo = false, lining = false, rim = true, shade = SHADE.warm, strands = false } = flags;
   const m = new THREE.MeshToonMaterial(params);
+  if (strands) m.defines = { ...(m.defines || {}), USE_UV: '' };
+  m.toneMapped = false; // colors are authored to match the sheet; the cap below keeps them in range
+  const own = { uShadeColor: { value: shade.clone() } };
+  m.userData.shade = own.uShadeColor;
   m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, U);
+    Object.assign(sh.uniforms, U, own);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\n' + SWAY_PARS)
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SWAY_MAIN)
       .replace('#include <project_vertex>', '#include <project_vertex>\nvGWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + FADE_PARS + '\nuniform vec3 uShadeColor, uLining;\nuniform float uShadeEdge;')
+      .replace('#include <common>', '#include <common>\n' + FADE_PARS + HOLO_PARS + '\nuniform vec3 uShadeColor, uLining;\nuniform float uShadeEdge, uLightCap;')
       .replace('#include <gradientmap_pars_fragment>', /* glsl */`
         vec3 getGradientIrradiance(vec3 normal, vec3 lightDirection) {
           float dotNL = dot(normal, lightDirection);
@@ -81,17 +99,31 @@ export function toonMaterial(U, params = {}, flags = {}) {
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         {
           ${holo ? `
-          // holographic film: pastel rainbow that slides with view angle and position (white areas only)
+          // holographic film on white areas: liquid pink/lavender/cyan/cream bands that slide with the view
           vec3 hv = normalize(vViewPosition);
           float ndv = dot(normal, hv);
-          float wHolo = smoothstep(0.78, 0.92, min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b)));
-          float hk = ndv * 1.25 + vGWorld.y * 2.6 + vGWorld.x * 1.7 + vGWorld.z * 1.1 + uTime * 0.05;
-          vec3 hc = 0.5 + 0.5 * cos(6.2832 * (hk + vec3(0.0, 0.33, 0.67)));
-          hc = mix(vec3(1.0), hc, 0.34);
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * hc * 1.03, wHolo);
-          totalEmissiveRadiance += diffuseColor.rgb * pow(1.0 - abs(ndv), 3.0) * 0.18 * wHolo;` : ''}
+          float wHolo = smoothstep(0.8, 0.93, min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b)));
+          vec3 wp = vGWorld * 1.0;
+          float liq = sin(wp.x * 21.0 + sin(wp.y * 15.0) * 1.6) + sin(wp.y * 17.0 - wp.z * 19.0 + sin(wp.x * 12.0) * 1.3) + 0.7 * sin((wp.x + wp.z) * 9.0 + wp.y * 6.0);
+          float hk = liq * 0.16 + ndv * 0.85 + uTime * 0.03;
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * pvHolo(hk), wHolo);
+          float streak = smoothstep(0.72, 0.97, sin(liq * 2.1 + ndv * 3.0));
+          totalEmissiveRadiance += vec3(1.0) * streak * 0.22 * wHolo + diffuseColor.rgb * pow(1.0 - abs(ndv), 3.0) * 0.12 * wHolo;` : ''}
           ${lining ? 'if (!gl_FrontFacing) diffuseColor.rgb = uLining;' : ''}
+          ${strands ? `
+          // inked strand lines running along each lock (anti-aliased, fade out when too dense)
+          float sx = vUv.x * 6.0 + sin(vUv.y * 11.0) * 0.12;
+          float fw = fwidth(sx);
+          float sl = abs(fract(sx) - 0.5);
+          float line = 1.0 - smoothstep(0.035, 0.035 + fw * 1.5, sl);
+          diffuseColor.rgb *= 1.0 - 0.2 * line * (1.0 - smoothstep(0.15, 0.4, fw));` : ''}
           totalEmissiveRadiance += diffuseColor.rgb * uSelfLit;
+        }`)
+      .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+        {
+          vec3 ls = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
+          reflectedLight.directDiffuse = min(ls, diffuseColor.rgb * uLightCap);
+          reflectedLight.indirectDiffuse = vec3(0.0);
         }`)
       .replace('#include <opaque_fragment>', `#include <opaque_fragment>
         ${rim ? `{
@@ -100,7 +132,7 @@ export function toonMaterial(U, params = {}, flags = {}) {
           gl_FragColor.rgb += uGlowColor * (rimF * (0.55 * uGhost * flick + 2.0 * uGlow) + 0.06 * uGlow);
         }` : ''}`);
   };
-  const key = `peachi-toon-${holo ? 1 : 0}${lining ? 1 : 0}${rim ? 1 : 0}`;
+  const key = `peachi-toon3-${holo ? 1 : 0}${lining ? 1 : 0}${rim ? 1 : 0}${strands ? 1 : 0}`;
   m.customProgramCacheKey = () => key;
   return m;
 }

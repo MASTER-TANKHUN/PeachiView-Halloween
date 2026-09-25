@@ -56,9 +56,8 @@
 
     // studio: soft sheet-like light · game: dark room, purple fog, flashlight from the camera
     const studio = new THREE.Group();
-    studio.add(new THREE.HemisphereLight(0xfff4fb, 0x9a8aa8, 0.85));
-    const key = new THREE.DirectionalLight(0xffffff, 1.35); key.position.set(1.2, 2.6, 2.4); studio.add(key);
-    const fill = new THREE.DirectionalLight(0xffe6f2, 0.3); fill.position.set(-2, 1.2, 1); studio.add(fill);
+    studio.add(new THREE.HemisphereLight(0xffffff, 0xd8cce6, 0.45));
+    const key = new THREE.DirectionalLight(0xffffff, Math.PI); key.position.set(0.9, 2.4, 3.0); studio.add(key);
     const game = new THREE.Group();
     game.add(new THREE.HemisphereLight(0x3a2a5a, 0x0a0610, 0.5));
     const rgb = new THREE.PointLight(0xff5fa8, 4, 6); rgb.position.set(-1.4, 1.6, -0.8); game.add(rgb);
@@ -98,6 +97,8 @@
       peachi = buildPeachi({ ghost });
       peachi.group.rotation.y = rotY;
       peachi.setExpression(expr); peachi.setPose(pose); peachi.setGlow(glow);
+      const hide = (q.get('hide') || '').split(',').filter(Boolean); // debug: ?hide=hair,outline
+      if (hide.length) peachi.group.traverse((o) => { if (o.isMesh && hide.includes(o.name)) o.visible = false; });
       scene.add(peachi.group);
       refresh();
     }

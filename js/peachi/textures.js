@@ -131,15 +131,16 @@ function drawSkirt(ctx, w, h) {
   for (let i = 0; i < 28; i++) { const x = (i + 0.5) * (w / 28); ctx.fillRect(x - 1.5, h * 0.12, 3, h * 0.78); }
   ctx.globalAlpha = 1;
   // holographic inverted pleat at the front
-  const fx = w * 0.5, top = h * 0.3;
-  const hg = ctx.createLinearGradient(fx - 60, top, fx + 60, h);
-  hg.addColorStop(0, '#b8e6ff'); hg.addColorStop(0.35, '#f3d4ff'); hg.addColorStop(0.7, '#ffd0e6'); hg.addColorStop(1, '#d2f4ff');
+  // holographic inverted pleat at the front (her left of center, like the sheet)
+  const fx = w * 0.53, top = h * 0.34;
+  const hg = ctx.createLinearGradient(fx - 30, top, fx + 30, h);
+  hg.addColorStop(0, 'rgba(150,200,255,0.55)'); hg.addColorStop(0.4, 'rgba(210,170,255,0.6)'); hg.addColorStop(0.75, 'rgba(255,170,215,0.6)'); hg.addColorStop(1, 'rgba(170,235,255,0.6)');
   ctx.fillStyle = hg;
-  ctx.beginPath(); ctx.moveTo(fx, top); ctx.lineTo(fx + 58, h * 0.9); ctx.lineTo(fx - 58, h * 0.9); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(fx, top); ctx.lineTo(fx + 30, h * 0.86); ctx.lineTo(fx - 30, h * 0.86); ctx.closePath(); ctx.fill();
   // thin pink/white stripes
-  for (const [y, a] of [[0.24, 0.9], [0.4, 0.95], [0.54, 1], [0.66, 1], [0.77, 1]]) {
-    ctx.fillStyle = `rgba(255,190,220,${a})`; ctx.fillRect(0, h * y, w, 4);
-    ctx.fillStyle = `rgba(255,120,180,${a * 0.9})`; ctx.fillRect(0, h * y + 4, w, 3);
+  for (const [y, a] of [[0.26, 0.7], [0.41, 0.8], [0.55, 0.9], [0.67, 1], [0.77, 1]]) {
+    ctx.fillStyle = `rgba(255,185,215,${a})`; ctx.fillRect(0, h * y, w, 2);
+    ctx.fillStyle = `rgba(245,110,170,${a * 0.85})`; ctx.fillRect(0, h * y + 2, w, 2);
   }
   // hem: pink band + white edge
   ctx.fillStyle = PINK; ctx.fillRect(0, h * 0.86, w, h * 0.09);

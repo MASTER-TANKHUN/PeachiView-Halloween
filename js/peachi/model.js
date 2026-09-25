@@ -7,7 +7,7 @@ import {
   heartGeo, roundRectShape, extrude, tint, atlasUV, setSway, place, normalize, PartBin,
 } from './geo.js';
 import { createAtlas } from './textures.js';
-import { createUniforms, toonMaterial, outlineMaterial } from './materials.js';
+import { createUniforms, toonMaterial, outlineMaterial, SHADE } from './materials.js';
 import { createFace, makeAngerMarkTexture, FACE_WINDOW } from './face.js';
 import { createAnimator } from './anim.js';
 
@@ -19,13 +19,13 @@ const C = {
   skin: 0xf6c8b2, navel: 0xd99684, white: 0xfbf8fd, lav: 0xece6fb, pink: 0xff8cbf, pinkDeep: 0xef5f9f,
   pinkPale: 0xffd0e4, coral: 0xf2566f, ink: 0x221f30, inkSoft: 0x2e2a42, gold: 0xebbd52, sock: 0x221f2d,
 };
-const HAIR = ['#3d1d16', '#58291f', '#733127', '#9a454c', '#de7a98', '#f6abc6'].map((c) => new THREE.Color(c));
+const HAIR = ['#55261c', '#733224', '#8f3b2c', '#bb5060', '#e8718f', '#f59cba'].map((c) => new THREE.Color(c));
 const _hc = new THREE.Color(), _ring = new THREE.Color('#9b5a4a');
 
 /** Hair color by height (the sheet's gradient is dark brown at the crown → pink below the chest). */
 function hairColorAt(y, out, ring = 0) {
-  const t = clamp01((1.56 - y) / 0.5); // 0 crown … 1 at y=1.06
-  const stops = [0, 0.28, 0.48, 0.62, 0.8, 1];
+  const t = clamp01((1.56 - y) / 0.46); // 0 crown … 1 at y=1.10
+  const stops = [0, 0.3, 0.5, 0.64, 0.8, 1];
   let i = 0;
   while (i < stops.length - 2 && t > stops[i + 1]) i++;
   out.copy(HAIR[i]).lerp(HAIR[i + 1], clamp01((t - stops[i]) / (stops[i + 1] - stops[i])));
@@ -90,8 +90,8 @@ function headPoint(u, v, o) {
   let x = Math.sin(p) * Math.sin(az), y = Math.cos(p), z = Math.sin(p) * Math.cos(az);
   if (y < 0) {
     const t = -y, front = smooth(-0.2, 0.9, z);
-    x *= 1 - 0.36 * Math.pow(t, 1.5) * (0.6 + 0.4 * front);
-    y *= 1 + 0.55 * t * front;
+    x *= (1 - 0.1 * smooth(0.05, 0.45, t)) * (1 - 0.5 * Math.pow(t, 1.3) * (0.6 + 0.4 * front));
+    y *= 1 + 0.47 * t * front;
     if (z > 0) z = z * (1 - 0.2 * t * t) + 0.05 * t * front;
     else { z *= 1 - 0.42 * t; y *= 1 - 0.12 * t; }
   }
@@ -144,7 +144,7 @@ function sphere(r, seg = 8) { return new THREE.SphereGeometry(r, seg, Math.max(4
 // headphones — authored around the cranium center (HC-local). add(key, geo, opts)
 // =====================================================================================
 function buildHeadphones(add, atlas) {
-  const Rx = 0.104, Ry = 0.12, zB = 0.004, A0 = 1.6;
+  const Rx = 0.106, Ry = 0.127, zB = 0.012, A0 = 1.62;
   const arc = (a, r, out) => out.set(Math.sin(a) * (Rx + r), Math.cos(a) * (Ry + r), zB);
   const band = (rIn, rOut, halfW, color) => surface((u, v, o) => {
     const a = lerp(-A0, A0, v), ph = u * TAU, c = Math.cos(ph), s = Math.sin(ph);
@@ -173,13 +173,13 @@ function buildHeadphones(add, atlas) {
       new THREE.Vector2(0.03, 0.006), new THREE.Vector2(0.044, 0.01), new THREE.Vector2(0.048, 0.019),
       new THREE.Vector2(0.047, 0.03), new THREE.Vector2(0.041, 0.036), new THREE.Vector2(0.03, 0.037),
     ], 28);
-    cup.push(['solid', tint(normalizeColor(shell), C.white)]);
+    cup.push(['solid', tint(normalizeColor(shell), C.pink)]);
     const rim = new THREE.TorusGeometry(0.041, 0.0055, 8, 28); rim.rotateX(PI / 2); rim.translate(0, 0.035, 0);
-    cup.push(['solid', tint(normalizeColor(rim), C.pink)]);
+    cup.push(['solid', tint(normalizeColor(rim), C.white)]);
     const plate = new THREE.CircleGeometry(0.037, 28); plate.rotateZ(s * PI / 2); plate.rotateX(-PI / 2); plate.translate(0, 0.0385, 0);
     cup.push(['print', atlasUV(normalizeColor(plate), atlas.rect('cup'))]);
     for (const [key, g] of cup) {
-      g.rotateZ(-s * PI / 2);
+      g.scale(1, 1, 1.14); g.rotateZ(-s * PI / 2);
       g.translate(s * 0.09, -0.052, 0);
       add(key, g, { outline: key === 'print' ? 0 : 1 });
     }
@@ -210,14 +210,16 @@ export function buildPeachi({ ghost = true } = {}) {
   const face = createFace();
 
   const M = {
-    solid: toonMaterial(U, { vertexColors: true, side: THREE.DoubleSide }),
-    holo: toonMaterial(U, { vertexColors: true, map: atlas.texture, side: THREE.DoubleSide }, { holo: true, lining: true }),
-    print: toonMaterial(U, { vertexColors: true, map: atlas.texture, alphaTest: 0.5, side: THREE.DoubleSide }),
+    solid: toonMaterial(U, { vertexColors: true, side: THREE.DoubleSide }, { shade: SHADE.cloth }),
+    skin: toonMaterial(U, { vertexColors: true }, { shade: SHADE.skin }),
+    hair: toonMaterial(U, { vertexColors: true, side: THREE.DoubleSide }, { shade: SHADE.warm, strands: true }),
+    holo: toonMaterial(U, { vertexColors: true, map: atlas.texture, side: THREE.DoubleSide }, { holo: true, lining: true, shade: SHADE.cloth }),
+    print: toonMaterial(U, { vertexColors: true, map: atlas.texture, alphaTest: 0.5, side: THREE.DoubleSide }, { shade: SHADE.cloth }),
     led: toonMaterial(U, { vertexColors: true, emissive: 0xff9ad0, emissiveIntensity: 0.75 }, { rim: false }),
     face: toonMaterial(U, {
       map: face.texture, transparent: true, depthWrite: false, emissive: 0xffffff, emissiveMap: face.texture, emissiveIntensity: 0.16,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
-    }, { rim: false }),
+    }, { rim: false, shade: SHADE.skin }),
   };
   const outline = outlineMaterial(U);
 
@@ -237,7 +239,12 @@ export function buildPeachi({ ghost = true } = {}) {
   const head = joint(torso, HEAD_O);
 
   const bin = new PartBin();
-  const W = (grp, key, geo, opts) => { const o = grp.userData.o; geo.translate(-o.x, -o.y, -o.z); return bin.add(grp, key, geo, opts); };
+  const W = (grp, key, geo, opts = {}) => {
+    const { pos, rot, scale, ...rest } = opts;
+    if (pos || rot || scale !== undefined) place(geo, pos, rot, scale ?? 1);
+    const o = grp.userData.o; geo.translate(-o.x, -o.y, -o.z);
+    return bin.add(grp, key, geo, rest);
+  };
   const L = (grp, key, geo, opts) => bin.add(grp, key, geo, opts);
   const white = atlas.white();
   const holoW = (grp, geo, opts) => W(grp, 'holo', atlasUV(geo, white), opts);
@@ -245,13 +252,13 @@ export function buildPeachi({ ghost = true } = {}) {
   const _p = V();
 
   // =================================================================== head
-  W(head, 'solid', surface(headPoint, 40, 30, { color: C.skin, flip: true }));
+  W(head, 'skin', surface(headPoint, 40, 30, { color: C.skin, flip: true }));
   { // face decal: same surface, planar-projected UVs from the front
     const fw = FACE_WINDOW;
     const g = surface((u, v, o) => {
       headPoint(lerp(0.3, 0.7, u), lerp(0.28, 0.86, v), o);
       _hd.copy(o).sub(HC).multiplyScalar(0.004); o.add(_hd);
-    }, 28, 28, { flip: true });
+    }, 22, 22, { flip: true });
     const pos = g.attributes.position, uv = g.attributes.uv;
     for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) - fw.x0) / (fw.x1 - fw.x0), (pos.getY(i) - fw.y0) / (fw.y1 - fw.y0));
     W(head, 'face', g, { outline: 0 });
@@ -264,82 +271,124 @@ export function buildPeachi({ ghost = true } = {}) {
       headAt(az, polMax(az) * v, 0.0085 + 0.004 * (1 - v), o);
     }, 36, 14, {
       flip: true,
+      sway: () => [0, 0],
+      uv: (u, v) => [u * 10, v],
       color: (u, v, p, c) => hairColorAt(p.y, c, 0.5 * Math.exp(-(((p.y - 1.545) / 0.01) ** 2)) * smooth(-0.02, 0.05, p.z - HC.z)),
     });
-    W(head, 'solid', g, { outline: 1 });
+    W(head, 'hair', g, { outline: 1 });
   }
+  let hairSeed = 3;
   const hairPiece = (pts, { w, d = 0.006, amp = 0.01, phase = 0, curl = 0.3, nv = 14, nu = 6, ringY = 1.545, shape = 'bang' }) => {
+    hairSeed = (hairSeed * 16807) % 2147483647;
+    const tone = 0.92 + 0.14 * (hairSeed / 2147483647);
     const path = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+    // w is the half-width. 'front' locks stay slim beside the face and fan out over the shoulders/chest.
     const width = shape === 'bang'
-      ? (t) => w * (0.72 + 0.5 * t) * (1 - Math.pow(t, 2.6))
-      : (t) => w * (0.62 + 0.55 * Math.sin(PI * Math.min(1, t * 1.15)) ** 0.6) * (1 - Math.pow(t, 3.2));
+      ? (t) => w * (0.82 + 0.3 * t) * Math.pow(1 - Math.pow(t, 5), 0.85)
+      : shape === 'front'
+        ? (t) => w * (0.24 + 0.9 * smooth(0.34, 0.66, t)) * (1 - Math.pow(t, 3.2))
+        : (t) => w * (0.62 + 0.55 * Math.sin(PI * Math.min(1, t * 1.15)) ** 0.6) * (1 - Math.pow(t, 3.2));
     const g = clump(path, {
       width, thick: (t) => d * (1 - 0.65 * t), outward: hairOutward, nu, nv, curl,
-      color: (u, v, p, c) => hairColorAt(p.y, c, 0.45 * Math.exp(-(((p.y - ringY) / 0.009) ** 2))),
+      color: (u, v, p, c) => {
+        const ph = u * TAU, cw = Math.abs(Math.cos(ph)), sn = Math.sin(ph);
+        hairColorAt(p.y, c, 0.45 * Math.exp(-(((p.y - ringY) / 0.009) ** 2)));
+        return c.multiplyScalar(tone * (1 - 0.3 * cw * cw * cw) * (sn < 0 ? 0.78 : 1));
+      },
       sway: (u, v) => [amp * Math.pow(v, 1.7), phase],
     });
-    W(head, 'solid', g, { outline: 1 });
+    W(head, 'hair', g, { outline: 1 });
   };
-  // ---- bangs [azimuth°, end polar (×π), width]
-  const BANGS = [[-64, 0.67, 0.028], [-50, 0.59, 0.03], [-36, 0.545, 0.03], [-22, 0.57, 0.03], [-9, 0.535, 0.028],
-    [4, 0.64, 0.019], [13, 0.54, 0.029], [25, 0.57, 0.03], [38, 0.53, 0.03], [51, 0.585, 0.03], [64, 0.67, 0.028]];
+  // ---- bangs [azimuth°, end polar (×π), width]: heavy, cut at the brows, one lock between the eyes
+  { // under-layer so no forehead shows between the locks
+    const g = surface((u, v, o) => {
+      const az = lerp(-78, 78, u) * DEG;
+      headAt(az, lerp(0.16, 0.5 + 0.08 * Math.pow(Math.abs(u - 0.5) * 2, 2), v) * PI, 0.0075, o);
+    }, 16, 6, { flip: true, color: (u, v, p, c) => hairColorAt(p.y, c).multiplyScalar(0.8) });
+    W(head, 'hair', g, { outline: 0 });
+  }
+  const BANGS = [[-74, 0.73, 0.013], [-61, 0.62, 0.022], [-47, 0.572, 0.036], [-34, 0.552, 0.036], [-22, 0.562, 0.036], [-10, 0.55, 0.036],
+    [2, 0.6, 0.013], [12, 0.55, 0.036], [25, 0.56, 0.036], [37, 0.548, 0.036], [49, 0.566, 0.036], [61, 0.62, 0.022], [74, 0.73, 0.013]];
   BANGS.forEach(([deg, end, w], i) => {
     const az = deg * DEG, off = i % 2 ? 0.0135 : 0.0115;
     hairPiece([
       headAt(az * 0.3, 0.05 * PI, off), headAt(az * 0.72, 0.22 * PI, off + 0.004), headAt(az * 0.94, 0.4 * PI, off + 0.005),
       headAt(az, (end - 0.07) * PI, off + 0.001), headAt(az * 1.03, end * PI, off - 0.004),
-    ], { w, d: 0.0055, amp: 0.004, phase: i * 1.3, curl: 0.35 });
+    ], { w, d: 0.0065, amp: 0.004, phase: i * 1.3, curl: 0.3 });
   });
-  // ---- face-framing locks (in front of the cups, down over the chest)
+  // ---- front hair: locks tucked under the headphone cups that come out below them and fall
+  // in front of the shoulders, over the collar and the upper sleeves (the face stays clear from the side)
   for (const s of [-1, 1]) {
+    // inner lock over the chest
     hairPiece([
-      headAt(s * 66 * DEG, 0.26 * PI, 0.014), headAt(s * 60 * DEG, 0.58 * PI, 0.02), V(s * 0.074, 1.385, 0.045),
-      V(s * 0.09, 1.3, 0.056), V(s * 0.102, 1.21, 0.062), V(s * 0.108, 1.12, 0.058), V(s * 0.118, 1.03, 0.05),
-    ], { w: 0.028, d: 0.01, amp: 0.018, phase: s * 2.1, curl: 0.25, nv: 24, shape: 'lock' });
+      headAt(s * 52 * DEG, 0.2 * PI, 0.014), headAt(s * 62 * DEG, 0.44 * PI, 0.02), V(s * 0.071, 1.45, 0.03),
+      V(s * 0.074, 1.4, 0.028), V(s * 0.077, 1.36, 0.036), V(s * 0.084, 1.31, 0.047), V(s * 0.1, 1.265, 0.05), V(s * 0.086, 1.205, 0.058),
+      V(s * 0.104, 1.15, 0.058), V(s * 0.126, 1.105, 0.052), V(s * 0.14, 1.08, 0.046),
+    ], { w: 0.034, d: 0.012, amp: 0.012, phase: s * 2.1, curl: 0.25, nv: 26, shape: 'front' });
+    // wide lock over the shoulder front and the upper sleeve, curling outward
     hairPiece([
-      headAt(s * 78 * DEG, 0.22 * PI, 0.014), headAt(s * 70 * DEG, 0.5 * PI, 0.022), V(s * 0.082, 1.4, 0.03),
-      V(s * 0.098, 1.31, 0.04), V(s * 0.112, 1.22, 0.046), V(s * 0.12, 1.14, 0.04),
-    ], { w: 0.026, d: 0.01, amp: 0.016, phase: s * 3.3, curl: 0.25, nv: 20, shape: 'lock' });
+      headAt(s * 72 * DEG, 0.17 * PI, 0.013), headAt(s * 80 * DEG, 0.42 * PI, 0.024), V(s * 0.078, 1.43, 0.006),
+      V(s * 0.088, 1.37, 0.02), V(s * 0.124, 1.315, 0.042), V(s * 0.158, 1.26, 0.062), V(s * 0.16, 1.2, 0.074),
+      V(s * 0.184, 1.15, 0.078), V(s * 0.21, 1.11, 0.074), V(s * 0.234, 1.085, 0.064), V(s * 0.25, 1.07, 0.056),
+    ], { w: 0.044, d: 0.015, amp: 0.016, phase: s * 3.3, curl: 0.22, nu: 8, nv: 26, shape: 'front' });
+    // outer lock: behind the cup, then spilling over the shoulder in an S-wave
+    hairPiece([
+      headAt(s * 86 * DEG, 0.2 * PI, 0.013), headAt(s * 98 * DEG, 0.45 * PI, 0.024), V(s * 0.086, 1.42, -0.042),
+      V(s * 0.112, 1.36, -0.022), V(s * 0.152, 1.315, 0.018), V(s * 0.19, 1.27, 0.03), V(s * 0.206, 1.21, 0.05),
+      V(s * 0.198, 1.16, 0.07), V(s * 0.214, 1.12, 0.08), V(s * 0.24, 1.1, 0.076),
+    ], { w: 0.042, d: 0.014, amp: 0.018, phase: s * 4.1, curl: 0.22, nu: 8, nv: 24, shape: 'front' });
+    // a thinner wisp between them for a layered edge
+    hairPiece([
+      headAt(s * 64 * DEG, 0.24 * PI, 0.015), headAt(s * 70 * DEG, 0.48 * PI, 0.022), V(s * 0.074, 1.43, 0.018),
+      V(s * 0.08, 1.37, 0.03), V(s * 0.1, 1.3, 0.05), V(s * 0.12, 1.235, 0.062), V(s * 0.118, 1.18, 0.066),
+    ], { w: 0.022, d: 0.009, amp: 0.014, phase: s * 1.2, curl: 0.25, nv: 22, shape: 'front' });
   }
-  // ---- back hair [azimuth°, tip y, tip radius, width, wave]: long and wavy at the sides, shorter over the hood
+  // ---- back hair: behind the cups and shoulders; long and wavy at the sides, ending at the hood in the middle.
+  // Waves stay in phase between neighbours (like real wavy hair) and an under-layer fills the gaps.
+  // [azimuth°, tip y, tip radius, width]
   const BACK = [
-    [104, 1.04, 0.3, 0.036, 1.2], [114, 1.0, 0.27, 0.05, 1], [126, 0.99, 0.24, 0.058, 1], [140, 1.02, 0.21, 0.06, 0.9],
-    [153, 1.12, 0.18, 0.06, 0.8], [166, 1.2, 0.162, 0.06, 0.6], [180, 1.265, 0.152, 0.064, 0.5],
-    [109, 1.07, 0.25, 0.05, 1.1], [120, 1.03, 0.24, 0.056, 1], [133, 1.04, 0.21, 0.058, 0.9], [147, 1.09, 0.19, 0.058, 0.8], [160, 1.17, 0.168, 0.058, 0.6], [173, 1.24, 0.155, 0.058, 0.5],
+    [94, 1.06, 0.25, 0.06], [106, 1.01, 0.245, 0.07], [118, 0.99, 0.232, 0.076], [130, 1.02, 0.212, 0.078],
+    [142, 1.06, 0.2, 0.078], [154, 1.14, 0.185, 0.076], [166, 1.23, 0.165, 0.074], [180, 1.3, 0.148, 0.078],
   ];
-  let hi = 0;
-  BACK.forEach(([deg, tipY, tipR, w, wave], bi) => {
-    const inner = bi >= 7;
-    for (const s of deg === 180 ? [1] : [-1, 1]) {
-      const a = s * deg * DEG, sx = Math.sin(a), cz = Math.cos(a);
-      const side = smooth(150, 105, deg); // side clumps fall behind the shoulders, clear of the arms
-      const pts = [headAt(a, 0.1 * PI, 0.012), headAt(a, 0.42 * PI, inner ? 0.018 : 0.022), headAt(a, 0.66 * PI, inner ? 0.022 : 0.03)];
-      const y0 = pts[2].y - 0.035;
-      for (const k of [0.18, 0.4, 0.62, 0.82, 1]) {
-        const y = lerp(y0, tipY, k);
-        const R = lerp(0.11, tipR, Math.pow(k, 1.1)) - (inner ? 0.01 : 0);
-        const wv = 0.02 * wave * Math.sin(k * 7 + deg * 0.07 + (inner ? 1.4 : 0)) * k;
-        // sides: pushed back (z) so they drape behind the upper arms, then flare out at the tips
-        const zBack = -0.07 * side * smooth(1.34, 1.2, y);
-        pts.push(V(sx * R + wv * cz, y, cz * R - 0.014 + zBack - wv * sx * 0.4));
-      }
-      hairPiece(pts, { w, d: 0.019, amp: 0.03, phase: hi++ * 1.37, curl: 0.2, nu: 8, nv: 24, shape: 'lock' });
-    }
-  });
-  { // back mass filling the gaps behind the clumps
+  const INNER = [[100, 1.05, 0.225, 0.07], [112, 1.02, 0.215, 0.074], [124, 1.02, 0.2, 0.076], [136, 1.05, 0.2, 0.076], [148, 1.1, 0.19, 0.074], [160, 1.19, 0.17, 0.07], [173, 1.27, 0.155, 0.07]];
+  const PSI = [{ k: 90, p: 114 }, { k: 106, p: 124 }, { k: 118, p: 131 }, { k: 130, p: 137 }, { k: 142, p: 141 }, { k: 154, p: 147 }, { k: 166, p: 158 }, { k: 176, p: 168 }];
+  const waveOf = (az, k) => 0.024 * Math.sin(k * 6.6 + az * 0.018) * smooth(0, 0.45, k);
+  const hangPoint = (sgn, az, k, y, tipR, inset, out, r0 = 0.105) => {
+    // sides swing back behind the shoulders; near the middle the hair parts around the hood
+    const a = sgn * az * DEG, psi = sgn * (az >= 179 ? 180 : tableLerp(PSI, az).p) * DEG;
+    const ang = lerp(a, psi, smooth(0, 0.45, k));
+    const R = lerp(r0, tipR, Math.pow(k, 0.85)) + 0.03 * smooth(0.65, 1, k) - inset;
+    const wv = waveOf(az, k) * sgn, sx = Math.sin(ang), cz = Math.cos(ang);
+    return out.set(sx * R + cz * wv, y, cz * R - 0.01 - sx * wv * 0.35);
+  };
+  const backClump = (sgn, az, tipY, tipR, w, inner) => {
+    const a = sgn * az * DEG;
+    // over the crown, down the back of the head, then hang straight off the nape (no outward jump → no twisting)
+    const off = inner ? 0.018 : 0.026;
+    const pts = [headAt(a * 0.85, 0.08 * PI, 0.012), headAt(a, 0.36 * PI, off - 0.004), headAt(a, 0.56 * PI, off), headAt(a, 0.68 * PI, off + 0.004)];
+    const last = pts[3], y0 = last.y, r0 = Math.hypot(last.x, last.z + 0.01) + (inner ? 0.014 : 0);
+    for (let i = 1; i <= 7; i++) { const k = i / 7; pts.push(hangPoint(sgn, az, k, lerp(y0, tipY, k), tipR, inner ? 0.014 : 0, V(), r0)); }
+    hairPiece(pts, { w, d: inner ? 0.016 : 0.021, amp: 0.026, phase: az * 0.02, curl: 0.18, nu: 8, nv: 22, shape: 'lock' });
+  };
+  for (const [az, tipY, tipR, w] of INNER) for (const sg of [-1, 1]) backClump(sg, az, tipY, tipR, w, true);
+  for (const [az, tipY, tipR, w] of BACK) for (const sg of az === 180 ? [1] : [-1, 1]) backClump(sg, az, tipY, tipR, w, false);
+  { // under-layer: a wavy curtain just inside the clumps, from the crown to a bit above the tips
+    const tipAt = (az) => tableLerp(BACK.map(([k, y, r]) => ({ k, y, r })), az);
     const g = surface((u, v, o) => {
-      const a = lerp(125, 235, u) * DEG, y = lerp(1.45, 1.2, v);
-      const R = lerp(0.085, 0.138, smooth(1.45, 1.3, y));
-      o.set(Math.sin(a) * R, y, Math.cos(a) * R * 0.98 - 0.004);
-    }, 16, 10, { flip: true, color: (u, v, p, c) => hairColorAt(p.y, c).multiplyScalar(0.8), sway: (u, v) => [0.012 * v * v, 0.4] });
-    W(head, 'solid', g, { outline: 0 });
+      const around = lerp(96, 264, u), sg = around <= 180 ? 1 : -1, az = around <= 180 ? around : 360 - around;
+      const T = tipAt(az);
+      const yTop = 1.44, y = lerp(yTop, T.y + 0.06, v);
+      const k = clamp01((yTop - y) / (yTop - T.y));
+      hangPoint(sg, az, k, y, T.r, 0.022 + 0.01 * (1 - k), o);
+    }, 32, 12, { color: (u, v, p, c) => hairColorAt(p.y, c).multiplyScalar(0.72), sway: (u, v) => [0.016 * v * v, 0.4] });
+    W(head, 'hair', g, { outline: 0 });
   }
   // ---- headphones + anger mark
   buildHeadphones((key, g, opts) => { g.translate(HC.x, HC.y, HC.z); W(head, key, g, opts); }, atlas);
 
   // =================================================================== neck, torso, crop top, choker
-  W(torso, 'solid', limb(0.13, 0.0295, 0.031, 14, 8, { cap0: 0.01, cap1: 0.01 }).translate(0, 1.425, -0.006), { color: C.skin });
-  W(torso, 'solid', surface((u, v, o) => torsoPoint(PI + TAU * u, lerp(0.9, 1.35, v), 0, o), 32, 30), { color: C.skin });
+  W(torso, 'skin', limb(0.13, 0.0295, 0.031, 14, 8, { cap0: 0.01, cap1: 0.01 }).translate(0, 1.425, -0.006), { color: C.skin });
+  W(torso, 'skin', surface((u, v, o) => torsoPoint(PI + TAU * u, lerp(0.9, 1.35, v), 0, o), 32, 30), { color: C.skin });
   W(torso, 'solid', ellipsoid(0.005, 0.008, 0.003, 8, 6), { pos: [0, 1.036, 0.056], color: C.navel, outline: 0 });
   W(torso, 'print', surface((u, v, o) => { const th = PI + TAU * u; torsoPoint(th, lerp(1.121, cropTop(th), v), 0.0035, o); }, 44, 10, {
     uv: (u, v) => { const r = atlas.rect('crop'); return [lerp(r[0], r[2], u), lerp(r[1], r[3], v)]; },
@@ -395,15 +444,15 @@ export function buildPeachi({ ghost = true } = {}) {
     };
     const hoodPoint = (u, v, o) => {
       const y = lerp(1.292, 1.13, v);
-      const halfW = 0.1 * Math.sqrt(Math.max(0, 1 - Math.pow(v * 0.96, 3)));
-      const puff = 0.03 * Math.pow(Math.sin(PI * u), 0.7) * Math.pow(Math.sin(PI * clamp01(v * 0.88 + 0.12)), 0.8);
+      const halfW = 0.118 * Math.sqrt(Math.max(0, 1 - Math.pow(v * 0.96, 3)));
+      const puff = 0.042 * Math.pow(Math.sin(PI * u), 0.7) * Math.pow(Math.sin(PI * clamp01(v * 0.88 + 0.12)), 0.8);
       return o.set((u - 0.5) * 2 * halfW, y, backZ(y) - puff - 0.006);
     };
     holoW(torso, surface(hoodPoint, 18, 12, { color: (u, v, p, c) => c.set(Math.abs(u - 0.5) < 0.05 ? C.pink : C.white) }));
     const edge = new THREE.CatmullRomCurve3(Array.from({ length: 9 }, (_, i) => hoodPoint(i / 8, 0, V()).add(V(0, 0.002, -0.004))));
     W(torso, 'solid', new THREE.TubeGeometry(edge, 24, 0.0075, 6), { color: C.pink });
     W(torso, 'print', atlasUV(surface((u, v, o) => {
-      hoodPoint(lerp(0.4, 0.6, 1 - u), lerp(0.56, 0.36, v), o); o.z -= 0.004;
+      hoodPoint(lerp(0.4, 0.6, 1 - u), lerp(0.74, 0.54, v), o); o.z -= 0.004;
     }, 4, 4), atlas.rect('emblem')), { outline: 0 });
     // PEACHI banner down the back
     W(torso, 'print', surface((u, v, o) => { const th = PI + (u - 0.5) * 0.7; jacketPoint(th, lerp(0.94, 1.175, v), 0.0045, o); }, 10, 10, {
@@ -418,8 +467,8 @@ export function buildPeachi({ ghost = true } = {}) {
     const elbow = new THREE.Group(); elbow.position.y = -UPPER; shoulder.add(elbow);
     const hand = new THREE.Group(); hand.position.y = -FORE; elbow.add(hand);
     const outerTh = s * PI / 2; // loft θ of the arm's outer side
-    L(shoulder, 'solid', ellipsoid(0.037, 0.042, 0.035, 14, 10), { pos: [s * 0.004, -0.012, 0], color: C.skin });
-    L(shoulder, 'solid', limb(UPPER, 0.033, 0.027, 14, 10, { cap0: 0.02, zs: 0.95 }), { color: C.skin });
+    L(shoulder, 'skin', ellipsoid(0.037, 0.042, 0.035, 14, 10), { pos: [s * 0.004, -0.012, 0], color: C.skin });
+    L(shoulder, 'skin', limb(UPPER, 0.033, 0.027, 14, 10, { cap0: 0.02, zs: 0.95 }), { color: C.skin });
     // sleeve: pink cap band → puffy holo upper sleeve → black band
     const upR = (y) => tableLerp([{ k: -0.275, r: 0.06 }, { k: -0.235, r: 0.058 }, { k: -0.19, r: 0.055 }, { k: -0.14, r: 0.051 }, { k: -0.105, r: 0.047 }], y).r;
     const wr = (th, y) => 1 + 0.045 * Math.sin(th * 5 + y * 40) + 0.03 * Math.sin(th * 3 - y * 25);
@@ -442,7 +491,7 @@ export function buildPeachi({ ghost = true } = {}) {
     L(shoulder, 'solid', frameGeo(0.026, 0.024, 0.0045, 0.004), { pos: [s * 0.061, -0.17, -0.004], rot: [0, s * PI / 2, 0], color: C.gold, outline: 0.5 });
 
     // forearm: balloon sleeve gathered into a banded cuff
-    L(elbow, 'solid', limb(FORE, 0.027, 0.02, 12, 10, { cap0: 0.02 }), { color: C.skin });
+    L(elbow, 'skin', limb(FORE, 0.027, 0.02, 12, 10, { cap0: 0.02 }), { color: C.skin });
     const loR = (y) => tableLerp([{ k: -0.2, r: 0.038 }, { k: -0.188, r: 0.05 }, { k: -0.165, r: 0.063 }, { k: -0.12, r: 0.068 }, { k: -0.06, r: 0.066 }, { k: 0.0, r: 0.062 }, { k: 0.035, r: 0.058 }], y).r;
     const droop = (y) => 0.012 * Math.exp(-(((y + 0.12) / 0.06) ** 2));
     holoL(elbow, surface((u, v, o) => {
@@ -461,12 +510,12 @@ export function buildPeachi({ ghost = true } = {}) {
     L(elbow, 'solid', frameGeo(0.02, 0.016, 0.0038, 0.004), { pos: [s * 0.04, -0.213, -0.004], rot: [0, s * PI / 2, 0], color: C.gold, outline: 0.5 });
 
     // hand: slim palm facing the thigh, four fingers, thumb forward
-    L(hand, 'solid', ellipsoid(0.0125, 0.034, 0.021, 12, 8), { pos: [0, -0.03, 0.002], color: C.skin });
+    L(hand, 'skin', ellipsoid(0.0125, 0.034, 0.021, 12, 8), { pos: [0, -0.03, 0.002], color: C.skin });
     const FING = [[0.012, 0.042, 0.03], [0.004, 0.047, 0.0], [-0.004, 0.045, -0.03], [-0.012, 0.037, -0.06]];
     for (const [z, len, fan] of FING) {
-      L(hand, 'solid', limb(len, 0.0064, 0.0052, 8, 6), { pos: [-s * 0.002, -0.058, z], rot: [fan, 0, -s * 0.42], color: C.skin, outline: 0.7 });
+      L(hand, 'skin', limb(len, 0.0064, 0.0052, 8, 6), { pos: [-s * 0.002, -0.058, z], rot: [fan, 0, -s * 0.42], color: C.skin, outline: 0.7 });
     }
-    L(hand, 'solid', limb(0.04, 0.0068, 0.0052, 8, 6), { pos: [-s * 0.004, -0.018, 0.018], rot: [-0.75, 0, -s * 0.35], color: C.skin, outline: 0.7 });
+    L(hand, 'skin', limb(0.04, 0.0068, 0.0052, 8, 6), { pos: [-s * 0.004, -0.018, 0.018], rot: [-0.75, 0, -s * 0.35], color: C.skin, outline: 0.7 });
     arms.push({ shoulder, elbow, hand, side: s });
   }
 
@@ -478,7 +527,7 @@ export function buildPeachi({ ghost = true } = {}) {
   const hemY = (th) => lerp(0.806, 0.822, (Math.cos(th) + 1) / 2);
   const skirtPoint = (u, v, o, off = 0, pl = PLEATS) => {
     const th = PI + TAU * u, R = skirtR(v);
-    const m = 1 + tri(u * pl) * (0.055 * (1 - v) + 0.008);
+    const m = 1 + tri(u * pl) * (0.034 * (1 - v) + 0.006);
     const y = lerp(hemY(th), 1.004, v);
     return o.set((R.rx + off) * Math.sin(th) * m, y, ((Math.cos(th) >= 0 ? R.rzF : R.rzB) + off) * Math.cos(th) * m);
   };
@@ -487,12 +536,12 @@ export function buildPeachi({ ghost = true } = {}) {
     sway: (u, v) => [0.01 * (1 - v) ** 2, u * TAU * 2],
   }), { outline: 0.9 });
   W(hips, 'solid', surface((u, v, o) => {
-    skirtPoint(u, lerp(0.02, 0.34, v), o, -0.012, 40);
-    o.y = lerp(0.792, 0.87, v);
-  }, 160, 3, {
-    color: (u, v, p, c) => c.set(tri(u * 40) > 0.6 ? C.lav : C.white),
+    skirtPoint(u, lerp(0.0, 0.3, v), o, -0.006);
+    o.y = lerp(0.793, 0.86, v);
+  }, PLEATS * 4, 3, {
+    color: (u, v, p, c) => c.set(v < 0.34 ? C.white : C.lav),
     sway: (u, v) => [0.01 * (1 - v) ** 2, u * TAU * 2],
-  }), { outline: 0.7 });
+  }), { outline: 0.35 });
   // belt
   const beltR = (v, R) => { R.y = lerp(0.99, 1.024, v); R.rx = 0.106; R.rzF = 0.073; R.rzB = 0.079; R.zc = 0; };
   W(hips, 'solid', loft(beltR, 36, 2, { color: (u, v, p, c) => c.set(v === 0 || v === 1 ? C.pinkPale : C.pink) }));
@@ -506,7 +555,7 @@ export function buildPeachi({ ghost = true } = {}) {
       const c = new THREE.CatmullRomCurve3(pts);
       for (let i = 0; i < n; i++) {
         const t = (i + 0.5) / n, p = c.getPointAt(t), tg = c.getTangentAt(t);
-        const link = new THREE.TorusGeometry(0.0058, 0.0015, 4, 10);
+        const link = new THREE.TorusGeometry(0.0058, 0.0015, 3, 8);
         link.rotateY(PI / 2);
         link.scale(1, 1, 1.35);
         const q = new THREE.Quaternion().setFromUnitVectors(V(0, 0, 1), tg);
@@ -557,11 +606,11 @@ export function buildPeachi({ ghost = true } = {}) {
     const sockLeg = s < 0; // her right leg wears the "249 PEACH" thigh-high
     const thighR = (y) => tableLerp([{ k: -0.37, rx: 0.043, rz: 0.044 }, { k: -0.3, rx: 0.046, rz: 0.047 }, { k: -0.2, rx: 0.053, rz: 0.055 }, { k: -0.08, rx: 0.06, rz: 0.062 }, { k: 0.06, rx: 0.064, rz: 0.066 }], y);
     const thighPt = (u, y, off, o) => { const th = PI + TAU * u, R = thighR(y); return o.set((R.rx + off) * Math.sin(th) + s * 0.004 * smooth(-0.16, 0, y), y, (R.rz + off) * Math.cos(th) + 0.004); };
-    L(hip, 'solid', surface((u, v, o) => thighPt(u, lerp(-0.37, 0.06, v), 0, o), 20, 12), { color: C.skin });
-    L(knee, 'solid', ellipsoid(0.042, 0.045, 0.043, 14, 10), { pos: [0, 0.005, 0.002], color: C.skin, outline: 0.6 });
+    L(hip, 'skin', surface((u, v, o) => thighPt(u, lerp(-0.37, 0.06, v), 0, o), 20, 12), { color: C.skin });
+    L(knee, 'skin', ellipsoid(0.042, 0.045, 0.043, 14, 10), { pos: [0, 0.005, 0.002], color: C.skin, outline: 0.6 });
     const shinR = (y) => tableLerp([{ k: -0.42, rx: 0.026, zf: 0.027, zb: 0.028 }, { k: -0.33, rx: 0.029, zf: 0.03, zb: 0.032 }, { k: -0.2, rx: 0.037, zf: 0.036, zb: 0.045 }, { k: -0.1, rx: 0.041, zf: 0.038, zb: 0.049 }, { k: 0.0, rx: 0.041, zf: 0.041, zb: 0.042 }, { k: 0.03, rx: 0.04, zf: 0.04, zb: 0.04 }], y);
     const shinPt = (u, y, off, o) => { const th = PI + TAU * u, R = shinR(y), c = Math.cos(th); return o.set((R.rx + off) * Math.sin(th), y, ((c > 0 ? R.zf : R.zb) + off) * c); };
-    L(knee, 'solid', surface((u, v, o) => shinPt(u, lerp(-0.42, 0.03, v), 0, o), 18, 12), { color: C.skin });
+    L(knee, 'skin', surface((u, v, o) => shinPt(u, lerp(-0.42, 0.03, v), 0, o), 18, 12), { color: C.skin });
     if (sockLeg) {
       const sr = atlas.rect('sock'), total = 0.19 + 0.325;
       const uvS = (u, dist) => [lerp(sr[0], sr[2], u), lerp(sr[3], sr[1], dist / total)];
@@ -589,18 +638,18 @@ export function buildPeachi({ ghost = true } = {}) {
 
     // ---- chunky high-top sneaker (ankle-local; floor at y = -0.095 when standing)
     const shoe = ankle;
-    const foot = roundedPoly([[-0.04, -0.085], [0.04, -0.085], [0.048, 0.02], [0.046, 0.12], [0.03, 0.158], [-0.03, 0.158], [-0.048, 0.12], [-0.05, 0.02]].map(([x, z]) => [x, -z]), 0.022);
+    const foot = roundedPoly([[-0.046, -0.088], [0.046, -0.088], [0.056, 0.02], [0.054, 0.118], [0.034, 0.162], [-0.034, 0.162], [-0.054, 0.118], [-0.058, 0.02]].map(([x, z]) => [x, -z]), 0.026);
     const slab = (y0, y1, grow, color) => {
-      const g = extrude(foot, y1 - y0, Math.min(0.004, (y1 - y0) * 0.3), { curveSegments: 6 });
+      const g = extrude(foot, y1 - y0, Math.min(0.004, (y1 - y0) * 0.3), { curveSegments: 3 });
       g.rotateX(-PI / 2); g.scale(1 + grow, 1, 1 + grow * 0.6); g.translate(0, (y0 + y1) / 2, 0.005);
       L(shoe, 'solid', g, { color, outline: 0.8 });
     };
     slab(-0.095, -0.087, 0.02, C.coral);
     slab(-0.088, -0.056, 0.0, C.white);
     slab(-0.079, -0.07, 0.035, C.coral);
-    L(shoe, 'solid', ellipsoid(0.045, 0.046, 0.086, 18, 10, { v1: 0.5 }), { pos: [0, -0.058, 0.072], color: C.white });
-    L(shoe, 'solid', ellipsoid(0.046, 0.02, 0.05, 16, 6, { v1: 0.5 }), { pos: [0, -0.057, 0.112], scale: [1.01, 1, 1], color: C.coral, outline: 0.5 });
-    const shaftR = (v, R) => { R.y = lerp(-0.058, 0.08, v); R.rx = lerp(0.05, 0.044, v); R.rzF = lerp(0.07, 0.043, smooth(0, 0.5, v)); R.rzB = lerp(0.084, 0.046, smooth(0, 0.6, v)); R.zc = lerp(0.012, -0.004, v); };
+    L(shoe, 'solid', ellipsoid(0.052, 0.048, 0.088, 18, 10, { v1: 0.5 }), { pos: [0, -0.058, 0.072], color: C.white });
+    L(shoe, 'solid', ellipsoid(0.053, 0.022, 0.052, 16, 6, { v1: 0.5 }), { pos: [0, -0.057, 0.112], scale: [1.01, 1, 1], color: C.coral, outline: 0.5 });
+    const shaftR = (v, R) => { R.y = lerp(-0.058, 0.08, v); R.rx = lerp(0.056, 0.047, v); R.rzF = lerp(0.07, 0.043, smooth(0, 0.5, v)); R.rzB = lerp(0.084, 0.046, smooth(0, 0.6, v)); R.zc = lerp(0.012, -0.004, v); };
     L(shoe, 'solid', loft(shaftR, 24, 8, { color: (u, v, p, c) => c.set(C.white) }));
     for (const k of [-1, 1]) { // coral side panels
       L(shoe, 'solid', loft(shaftR, 4, 3, { a0: k > 0 ? 0.08 : 0.72, a1: k > 0 ? 0.28 : 0.92, post: (u, v, th, o) => { o.x *= 1.03; o.z *= 1.03; } }), { color: C.coral, outline: 0.5 });
@@ -638,6 +687,8 @@ export function buildPeachi({ ghost = true } = {}) {
   const anger = new THREE.Sprite(new THREE.SpriteMaterial({ map: angerTex, transparent: true, depthWrite: false }));
   anger.position.copy(HC).sub(HEAD_O).add(V(0.068, 0.07, 0.07));
   anger.scale.setScalar(0.06); anger.visible = false; head.add(anger);
+  const faceAnchor = new THREE.Object3D(); faceAnchor.name = 'faceAnchor';
+  faceAnchor.position.set(0, FACE_HEIGHT - HEAD_O.y, 0.08 - HEAD_O.z); head.add(faceAnchor);
 
   const animator = createAnimator({ root, hips, torso, head, arms, legs }, { ghost, U });
   const _s = V();
@@ -646,6 +697,7 @@ export function buildPeachi({ ghost = true } = {}) {
   const model = {
     group,
     faceHeight: FACE_HEIGHT,
+    faceAnchor, // Object3D at the center of her face (follows head/lean/lunge): faceAnchor.getWorldPosition(v)
     get expression() { return face.expression; },
     get pose() { return animator.pose; },
     setExpression(name) {

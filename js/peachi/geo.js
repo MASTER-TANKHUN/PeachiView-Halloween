@@ -155,13 +155,13 @@ export function roundRectShape(w, h, r) {
   s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
   return s;
 }
-export function extrude(shape, depth, bevel = depth * 0.35, { curveSegments = 10, bevelSegments = 2, holes } = {}) {
+export function extrude(shape, depth, bevel = depth * 0.35, { curveSegments = 5, bevelSegments = 1, holes } = {}) {
   if (holes) shape.holes.push(...holes);
   const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments, curveSegments });
   g.translate(0, 0, -depth / 2);
   return g;
 }
-export function heartGeo(s, depth = s * 0.5) { return extrude(heartShape(s), depth, depth * 0.45); }
+export function heartGeo(s, depth = s * 0.5) { return extrude(heartShape(s), depth, depth * 0.45, { curveSegments: 4 }); }
 
 /** Make any geometry mergeable with surface() output: indexed, with normal/uv/color/aSway, no groups. */
 export function normalize(g, color = 0xffffff) {
@@ -226,6 +226,7 @@ export class PartBin {
   /** outline: width multiplier (0 = no outline). */
   add(group, matKey, geo, { pos, rot, scale, outline = 1, color } = {}) {
     normalize(geo, color);
+    if (color !== undefined) tint(geo, color);
     if (pos || rot || scale !== undefined) place(geo, pos, rot, scale ?? 1);
     const key = group.uuid + '|' + matKey;
     if (!this.bins.has(key)) this.bins.set(key, { group, matKey, geos: [] });

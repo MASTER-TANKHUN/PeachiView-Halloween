@@ -279,11 +279,12 @@ export class PeachiGhost {
     const pos = this.group.position;
     const k = Math.min(1, this.jumpTimer / 0.12); // lunge in fast
     const dist = 1.0 - 0.25 * k;
-    pos.set(pp.x + this.jsDir.x * dist, 0.3 * k, pp.z + this.jsDir.y * dist);
+    pos.set(pp.x + this.jsDir.x * dist, 0.12 * k, pp.z + this.jsDir.y * dist);
     this.group.rotation.y = Math.atan2(pp.x - pos.x, pp.z - pos.z);
 
     const eye = new THREE.Vector3(pp.x, (pp.y || 0) + 1.6, pp.z);
-    const face = new THREE.Vector3(pos.x, pos.y + 1.22, pos.z);
+    const face = new THREE.Vector3(pos.x, pos.y + (this.model.faceHeight || 1.22), pos.z);
+    if (this.model.faceAnchor) { this.group.updateMatrixWorld(true); this.model.faceAnchor.getWorldPosition(face); }
     const fx = face.x - eye.x, fy = face.y - eye.y, fz = face.z - eye.z;
     player.yaw = Math.atan2(-fx, -fz);
     player.pitch = Math.atan2(fy, Math.hypot(fx, fz));
