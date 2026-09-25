@@ -7,6 +7,7 @@ import { sfx } from './audio.js';
 import { Scream } from './mic.js';
 import { PeachiGhost } from './ghosts/peachi.js';
 import { Night } from './night.js';
+import { createPost } from './world/post.js';
 
 const params = new URLSearchParams(location.search);
 const AUTOSTART = params.get('autostart') === '1';
@@ -16,9 +17,12 @@ const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// tone mapping happens in the post grade pass (soft highlight roll-off); without post fall back to ACES
+const USE_POST = params.get('post') !== '0';
+renderer.toneMapping = USE_POST ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -29,14 +33,19 @@ function onResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  if (post) post.setSize(window.innerWidth, window.innerHeight);
 }
 window.addEventListener('resize', onResize);
+let post = null;
 
 // ---------------------------------------------------------------- boot
 UI.init();
 UI.showScreen('menu');
 
 const level = buildLevel(scene);
+if (USE_POST) {
+  try { post = createPost(renderer, scene, camera); } catch (e) { console.warn('post-processing unavailable', e); renderer.toneMapping = THREE.ACESFilmicToneMapping; }
+}
 if (!scene.fog) scene.fog = new THREE.FogExp2(0x1a0b2e, 0.06);
 const player = new Player(camera, renderer.domElement, level);
 if (!camera.parent) scene.add(camera); // flashlight SpotLight hangs off the camera
@@ -154,7 +163,7 @@ function frame() {
     const key = String(e && e.message);
     if (!reported.has(key)) { reported.add(key); console.error('[game loop]', e); }
   }
-  renderer.render(scene, camera);
+  if (post) post.render(dt); else renderer.render(scene, camera);
 }
 
 if (AUTOSTART) {

@@ -48,6 +48,13 @@ export class Player {
     // flashlight: warm spot hanging off the camera, aimed forward
     const spot = new THREE.SpotLight(0xffe2b8, 0, 14, 0.45, 0.45, 1.5);
     spot.position.set(0.12, -0.12, 0);
+    // the beam casts shadows (furniture shadows swinging with the flashlight); ghosts don't cast any
+    spot.castShadow = true;
+    spot.shadow.mapSize.set(1024, 1024);
+    spot.shadow.camera.near = 0.15;
+    spot.shadow.camera.far = 14;
+    spot.shadow.bias = -0.0006;
+    spot.shadow.normalBias = 0.02;
     spot.target.position.set(0, 0, -8);
     camera.add(spot);
     camera.add(spot.target);
