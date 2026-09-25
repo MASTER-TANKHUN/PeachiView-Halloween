@@ -138,6 +138,7 @@
     renderer.setAnimationLoop(() => {
       const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime;
       if (spin) peachi.group.rotation.y += dt * 0.5;
+      if (q.get('look') !== '0') peachi.lookAt(camera.position);
       peachi.update(dt, t);
       item.userData.update(dt, t);
       controls.update();

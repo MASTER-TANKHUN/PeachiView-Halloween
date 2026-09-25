@@ -752,9 +752,9 @@ export function buildPeachi({ ghost = true } = {}) {
   const faceAnchor = new THREE.Object3D(); faceAnchor.name = 'faceAnchor';
   faceAnchor.position.set(0, FACE_HEIGHT - NECK_LIFT - HEAD_O.y, 0.08 - HEAD_O.z); head.add(faceAnchor);
 
-  const animator = createAnimator({ root, hips, torso, head, arms, legs }, { ghost, U });
-  const _s = V();
-  let glow = 0;
+  const animator = createAnimator({ root, hips, torso, head, arms, legs }, { ghost, U, upper: UPPER, fore: FORE });
+  const _s = V(), _look = V(), _last = V(), _vel = V();
+  let glow = 0, lookTarget = null, hasLast = false;
 
   const model = {
     group,
@@ -769,7 +769,17 @@ export function buildPeachi({ ghost = true } = {}) {
     },
     setPose(name) { animator.setPose(name); },
     setGlow(v) { glow = THREE.MathUtils.clamp(v, 0, 1); U.uGlow.value = glow; },
+    /** 0..1: fade her to a pitch-black silhouette */
+    setDark(v) { U.uDark.value = THREE.MathUtils.clamp(v, 0, 1); },
+    /** World-space point for her head to follow (e.g. the camera), or null. */
+    lookAt(v) { lookTarget = v ? (lookTarget || V()).copy(v) : null; },
     update(dt, t) {
+      // velocity in her own frame (for leaning into the motion), from how the group moved
+      group.updateMatrixWorld();
+      const p = _s.setFromMatrixPosition(group.matrixWorld);
+      if (hasLast && dt > 1e-4) { _vel.copy(p).sub(_last).divideScalar(dt); _vel.y = 0; _vel.applyAxisAngle(V(0, 1, 0), -group.rotation.y); if (_vel.lengthSq() > 100) _vel.set(0, 0, 0); animator.setVelocity(_vel); }
+      _last.copy(p); hasLast = true;
+      if (lookTarget) { torso.updateMatrixWorld(); animator.setLook(torso.worldToLocal(_look.copy(lookTarget))); } else animator.setLook(null);
       animator.update(dt, t);
       face.update(dt, t);
       const he = head.matrixWorld.elements; // head frame for the face shading (one frame behind is fine)

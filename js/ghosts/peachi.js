@@ -11,14 +11,14 @@ const TAU = Math.PI * 2;
 
 const TELEPORT_LINES = [
   'แฮร่~ อยู่ข้างหลังนะ~',
-  'คิกๆ หันมาสิม็อดใหม่~',
+  'คิกๆ หันมาสิมอดใหม่~',
   'เซอร์ไพรส์! พีชชี่วาร์ปได้ด้วยนะ',
   'เดินหนีทำไมอ่า~ คิกๆ',
 ];
 const MISS_TOASTS = [
   'ตะโกนใส่อากาศ… พีชชี่อยู่ไกลเกินไป',
   'ตะโกนใส่อากาศ… ข้างบ้านตื่นแทน',
-  'ตะโกนใส่อากาศ… แชท: "ม็อดเป็นอะไรคะ"',
+  'ตะโกนใส่อากาศ… แชท: "มอดเป็นอะไรคะ"',
   'ตะโกนใส่อากาศ… ต้องเข้าใกล้กว่านี้ (7 ม.)',
 ];
 
@@ -82,6 +82,7 @@ export class PeachiGhost {
 
   // ---------------------------------------------------------------- update
   update(dt, t, ctx) {
+    if (ctx && ctx.camera && this.state !== 'jumpscare') this.model.lookAt(ctx.camera.getWorldPosition(this._eye || (this._eye = new THREE.Vector3())));
     this.model.update(dt, t);
     if (!this.active || !ctx) return;
     const { player, camera, hour = 0 } = ctx;
@@ -235,7 +236,7 @@ export class PeachiGhost {
     this.state = 'stunned';
     this.stunTimer = 3;
     this.mood = Math.max(0, this.mood - 25);
-    this._setPose('idle');
+    this._setPose('stunned');
     this._setExpression('cry');
     this._setFlicker(true);
     let nx = dx, nz = dz;

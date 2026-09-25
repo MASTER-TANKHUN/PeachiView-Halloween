@@ -19,22 +19,22 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const randInt = (a, b) => Math.floor(rand(a, b + 1));
 
 const HYPE_USERS = ['ติ่งพีช249', 'mod_ตัวจริง', 'peachlover', 'คนดูเงียบๆ', 'นอนไม่หลับ', 'ลูกพีชซ่า'];
-const TENSION_CHAT = ['ข้างหลัง!!!', 'วิ่งงงงงง', 'ม็อดใหม่จะรอดมั้ย 555', 'ตะโกนใส่เลยม็อด!!', 'ไฟฉาย! ส่องหน้าเลย', 'ใจเต้นแรงมากก'];
+const TENSION_CHAT = ['ข้างหลัง!!!', 'วิ่งงงงงง', 'มอดใหม่จะรอดมั้ย 555', 'ตะโกนใส่เลยมอด!!', 'ไฟฉาย! ส่องหน้าเลย', 'ใจเต้นแรงมากก'];
 const OBJ_FIND = 'ตามหา "หูฟังหูแมว" ของพีชชี่ในบ้าน';
 const OBJ_RETURN = 'เอาหูฟังไปวางคืนที่ "โต๊ะสตรีม"';
 
 const LOSE_TEXT = {
   caught: {
     title: 'โดนพีชชี่กอดแน่นจนวิญญาณหลุด!',
-    text: 'ม็อดใหม่ทำงานวันแรกก็โดนผีสตรีมเมอร์จับได้… คลิปนี้ยอดวิวพุ่งทะลุล้าน แต่คุณไม่รอดดูแล้วนะ',
+    text: 'มอดใหม่ทำงานวันแรกก็โดนผีสตรีมเมอร์จับได้… คลิปนี้ยอดวิวพุ่งทะลุล้าน แต่คุณไม่รอดดูแล้วนะ',
   },
   timeout: {
-    title: 'พีชชี่งอนจนกรีด',
-    text: 'ตีหกแล้วหูฟังหูแมวยังไม่กลับบ้าน… พีชชี่กรีดร้องจนไลฟ์เสียงแตก ม็อดโดนปลดกลางอากาศ',
+    title: 'พีชชี่งอนจนกรี๊ด',
+    text: 'ตีหกแล้วหูฟังหูแมวยังไม่กลับบ้าน… พีชชี่กรีดร้องจนไลฟ์เสียงแตก มอดโดนปลดกลางอากาศ',
   },
   viewers: {
     title: 'ไลฟ์ล่ม',
-    text: 'สแปมผีเต็มแชทจนคนดูหนีหมด เหลือแต่ผีดูอยู่คนเดียว… ม็อดใหม่โดนแบนตัวเองซะงั้น',
+    text: 'สแปมผีเต็มแชทจนคนดูหนีหมด เหลือแต่ผีดูอยู่คนเดียว… มอดใหม่โดนแบนตัวเองซะงั้น',
   },
 };
 
@@ -92,6 +92,20 @@ export class Night {
   }
 
   // ---------------------------------------------------------------- lifecycle
+  /** Leave the night early (back to the title screen). */
+  abort() {
+    if (this.state === 'play') this._end();
+    this.state = 'idle';
+    this._clearHandles();
+    this.holder.visible = false;
+    this.carrying = false;
+    this.peachi.active = false;
+    this.peachi._setFlicker(false);
+    if (UI.chat.clear) UI.chat.clear();
+    UI.setObjective(null);
+    UI.subtitle(null);
+  }
+
   start() {
     const { player, level, peachi } = this;
     this._clearHandles();
@@ -173,7 +187,7 @@ export class Night {
     UI.setObjective(OBJ_RETURN);
     UI.toast('ได้หูฟังหูแมวแล้ว! รีบเอาไปคืนที่โต๊ะสตรีม');
     this._addViewers(randInt(8, 15));
-    UI.chat.push({ user: pick(HYPE_USERS), text: 'เจอหูฟังแล้ววว เก่งมากม็อด!', type: 'normal' });
+    UI.chat.push({ user: pick(HYPE_USERS), text: 'เจอหูฟังแล้ววว เก่งมากมอด!', type: 'normal' });
     this.peachi.onHeadphonesFound();
   }
 
@@ -200,7 +214,7 @@ export class Night {
     if (line) UI.subtitle(line, 4000);
     UI.showScreen('win', {
       title: 'รอดคืนแรก! ไลฟ์ยังไม่ล่ม',
-      text: `หูฟังหูแมวกลับมาที่โต๊ะแล้ว พีชชี่ยิ้มหวาน (แบบผีๆ) ผู้ชม ${Math.round(this.viewers)} คนส่งหัวใจรัวๆ … เจอกันคืนที่ 2 นะม็อด`,
+      text: `หูฟังหูแมวกลับมาที่โต๊ะแล้ว พีชชี่ยิ้มหวาน (แบบผีๆ) ผู้ชม ${Math.round(this.viewers)} คนส่งหัวใจรัวๆ … เจอกันคืนที่ 2 นะมอด`,
     });
     this.onEnd('win');
   }

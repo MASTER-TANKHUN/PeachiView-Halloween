@@ -46,7 +46,7 @@ function drapeGeo(w, h, folds = 6, amp = 0.035) {
 export function roomPeachi(P, kit, M, root) {
   roomMaterials(M);
   const { add, at, pic, framed } = P;
-  const lights = [], anim = [];
+  const lights = [], anim = [], screens = {};
 
   // =========================================================== wall finishes
   // feature wallpaper behind the desk, framed by a thin white molding
@@ -152,7 +152,8 @@ export function roomPeachi(P, kit, M, root) {
       add('plastic', S.rbox(0.05, 0.3, 0.03, 0.01), { p: [0, 0.16, -0.02], color: WHITE });
       add('plastic', S.rbox(0.76, 0.45, 0.035, 0.012), { p: [0, 0.37, 0], color: 0xf4f0f2 });
       add('plastic', S.rbox(0.3, 0.2, 0.03, 0.02), { p: [0, 0.37, -0.03], color: 0xe8e2e6 });
-      pic(A.monitorStream(), 0.72, 0.405, { p: [0, 0.378, 0.0185], basic: true, emit: 1.25 });
+      screens.main = A.monitorStream();
+      pic(screens.main, 0.72, 0.405, { p: [0, 0.378, 0.0185], basic: true, emit: 1.25 });
       pic(A.stickyNotes(), 0.2, 0.1, { p: [-0.29, 0.18, 0.02], transparent: true, alphaTest: 0.1 });
       // webcam on top
       add('plastic', S.rbox(0.09, 0.03, 0.03, 0.012), { p: [0, 0.61, 0.005], color: 0x1a1a20 });
@@ -526,11 +527,11 @@ export function roomPeachi(P, kit, M, root) {
   at(-2.1 - 0.18, 2.8, -1.1 - 0.18, -Math.PI * 3 / 4, () => P.cobweb(0.56), 0.3);
 
   // lights
-  lights.push({ color: 0xff4fc0, intensity: 3.0, dist: 8.5, p: [-6.0, 2.55, -4.0], kind: 'rgb' });
+  lights.push({ color: 0xff4fc0, intensity: 2.6, dist: 9, p: [-6.0, 2.05, -3.9], kind: 'rgb' });
 
   return {
     lights,
-    deskPosition,
+    deskPosition, screens,
     spawn: { position: V(-5.1, 0, -2.5), yaw: 0.35 },
     itemSpots: [V(-7.9, 0.62, -5.2), V(-2.55, 0.86, -3.3), V(-9.0, 0.95, -3.3)],
     navPoints: [V(-7.2, 0, -3.6), V(-4.2, 0, -2.4), V(-6.0, 0, -4.6)],

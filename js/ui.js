@@ -1,24 +1,39 @@
-// DOM HUD + screens for the livestream overlay. Builds everything inside #hud.
+// DOM layer: title screen (play / how to play / settings / credits), pause, intro, end screens and the
+// in-game stream HUD. Everything is built inside #hud. No emoji: small inline SVG icons, and Peachi's
+// mood is shown with her own face art.
+import { Settings } from './settings.js';
 
 const MAX_CHAT = 12;
 const SPAM_TTL_HINT = 8; // seconds (visual timer only; the rule lives in the game logic)
+const FACE = (name) => new URL(`../assets/peachi/face_${name}.webp`, import.meta.url).href;
 
 const MOODS = {
-  happy: { emoji: '😊', label: 'อารมณ์ดี' },
-  cry: { emoji: '😢', label: 'เหงา...' },
-  angry: { emoji: '😠', label: 'โกรธ!!' },
-  scream: { emoji: '😱', label: 'กรี๊ดดด!!' },
+  happy: { label: 'อารมณ์ดี', face: 'happy' },
+  cry: { label: 'เริ่มเหงา', face: 'cry' },
+  angry: { label: 'โกรธแล้ว', face: 'angry' },
+  scream: { label: 'กรี๊ด', face: 'scream' },
 };
+
+const ICON = {
+  eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></svg>',
+  light: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9h9l3.5-3.5h4.5v13H16L12.5 15h-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  mic: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  key: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="19" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 13.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+};
+const PEACH = '<svg class="peach-mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 15c-9-6-25-2-25 16 0 14 11 25 25 25s25-11 25-25c0-18-16-22-25-16z" fill="#ffae98"/><path d="M32 17c-5 10-5 25 0 37" stroke="#e8708e" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M33.5 14c3-8 12-10 18-8-2 7-9 11-18 8z" fill="#7fcb8c"/></svg>';
 
 let root = null;
 let E = {};
-const startCbs = [];
-const retryCbs = [];
+const cbs = { start: [], retry: [], home: [], resume: [] };
 let chatMsgs = []; // { el, type, t0, banned }
 let viewers = { shown: 0, target: 0, from: 0, t0: 0 };
 let subTimer = 0;
 let subType = 0;
 let currentScreen = null;
+let menuPanel = null;       // open panel on the title screen
+let pausePanel = null;      // open panel on the pause screen
+let sound = () => {};       // UI blips (set by main once audio exists)
 
 function el(tag, cls, parent, text) {
   const n = document.createElement(tag);
@@ -27,22 +42,22 @@ function el(tag, cls, parent, text) {
   if (parent) parent.appendChild(n);
   return n;
 }
+function html(tag, cls, parent, markup) { const n = el(tag, cls, parent); n.innerHTML = markup; return n; }
 const pad = (n) => String(Math.max(0, Math.floor(n))).padStart(2, '0');
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const now = () => performance.now();
+const fire = (k, ...a) => { for (const f of cbs[k]) f(...a); };
 
 function restartAnim(node, cls) {
   node.classList.remove(cls);
-  void node.offsetWidth; // reflow so the animation restarts
+  void node.offsetWidth;
   node.classList.add(cls);
 }
-
 function userColor(name) {
   let h = 0;
   for (const c of name) h = (h * 31 + c.codePointAt(0)) >>> 0;
-  return `hsl(${h % 360} 85% 72%)`;
+  return `hsl(${h % 360} 70% 74%)`;
 }
-
 function scTier(amount) {
   if (amount >= 500) return 'sc-t5';
   if (amount >= 200) return 'sc-t4';
@@ -51,162 +66,249 @@ function scTier(amount) {
   return 'sc-t1';
 }
 
-function makeGrain() {
-  try {
-    const c = document.createElement('canvas');
-    c.width = c.height = 160;
-    const g = c.getContext('2d');
-    const img = g.createImageData(160, 160);
-    for (let i = 0; i < img.data.length; i += 4) {
-      const v = Math.random() * 255;
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-      img.data[i + 3] = 255;
-    }
-    g.putImageData(img, 0, 0);
-    return c.toDataURL();
-  } catch { return ''; }
+// ------------------------------------------------------------------ menu list with keyboard support
+function menuList(parent, items, onPick) {
+  const nav = el('nav', 'mlist', parent);
+  const btns = items.map(([id, label, hint], i) => {
+    const b = el('button', 'mitem', nav);
+    b.type = 'button'; b.dataset.id = id;
+    el('span', 'mitem-bar', b);
+    el('span', 'mitem-label', b, label);
+    if (hint) el('span', 'mitem-hint', b, hint);
+    b.addEventListener('mouseenter', () => focus(i));
+    b.addEventListener('click', () => { b.blur(); sound('select'); onPick(id); });
+    return b;
+  });
+  let cur = 0;
+  function focus(i, silent) {
+    i = (i + btns.length) % btns.length;
+    if (i !== cur && !silent) sound('move');
+    cur = i;
+    btns.forEach((b, k) => b.classList.toggle('on', k === cur));
+  }
+  focus(0, true);
+  return { nav, btns, focus, move: (d) => focus(cur + d), pick: () => { sound('select'); onPick(btns[cur].dataset.id); }, reset: () => focus(0, true) };
 }
 
-function build() {
-  root = el('div', 'pv-root');
-  root.dataset.screen = 'none';
+// ------------------------------------------------------------------ settings form (shared by title + pause)
+function buildSettings(parent) {
+  const form = el('div', 'sform', parent);
+  const s = Settings.get();
+  const row = (label, note) => { const r = el('div', 'srow', form); const l = el('div', 'slab', r); el('div', 'sname', l, label); if (note) el('div', 'snote', l, note); return el('div', 'sctl', r); };
+  const slider = (label, key, min, max, step, show, note) => {
+    const c = row(label, note);
+    const inp = el('input', 'srange', c); inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = s[key];
+    const out = el('span', 'sval', c, show(+inp.value));
+    const paint = () => inp.style.setProperty('--p', `${((inp.value - min) / (max - min)) * 100}%`);
+    paint();
+    inp.addEventListener('input', () => { out.textContent = show(+inp.value); paint(); Settings.set({ [key]: +inp.value }); });
+    return inp;
+  };
+  const choice = (label, key, opts, note) => {
+    const c = row(label, note), seg = el('div', 'sseg', c);
+    const bs = opts.map(([v, t]) => { const b = el('button', 'sopt', seg, t); b.type = 'button'; b.addEventListener('click', () => { sound('move'); Settings.set({ [key]: v }); bs.forEach((x) => x.classList.toggle('on', x === b)); }); b.classList.toggle('on', s[key] === v); return b; });
+  };
+  slider('ระดับเสียง', 'volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}`);
+  slider('ความไวเมาส์', 'sensitivity', 0.4, 2, 0.05, (v) => v.toFixed(2));
+  slider('มุมกล้อง', 'fov', 60, 90, 1, (v) => `${v}°`);
+  choice('คุณภาพภาพ', 'quality', [['high', 'สูง'], ['medium', 'กลาง'], ['low', 'ต่ำ']], 'ต่ำ = ปิดเงาและแสงฟุ้ง เหมาะกับเครื่องที่ไม่แรง');
+  choice('กรี๊ดใส่ไมค์', 'mic', [[true, 'ใช้'], [false, 'ไม่ใช้']], 'ไม่ใช้ไมค์ก็กด Space รัวๆ แทนได้');
+  choice('ลดแสงวาบและจอสั่น', 'calm', [[false, 'ปกติ'], [true, 'ลด']]);
+  return form;
+}
+function buildHowto(parent) {
+  el('p', 'ptext', parent, 'คืนฮาโลวีน พีชชี่ลืมปิดไลฟ์แล้วเผลอหลับ ตื่นมาอีกทีกลายเป็นผีติดอยู่ในไลฟ์ของตัวเอง คุณคือมอดมือใหม่ที่ถูกเรียกมาตอนตีสาม');
+  el('p', 'ptext', parent, 'หาหูฟังหูแมวที่หายไปในบ้าน แล้วเอาไปวางคืนที่โต๊ะสตรีมก่อนหกโมงเช้า ถ้าพีชชี่เหงานานๆ เธอจะเริ่มโกรธและไล่ตามคุณ');
+  const grid = el('div', 'keys', parent);
+  for (const [k, v] of [['W A S D', 'เดิน'], ['Shift', 'วิ่ง'], ['เมาส์', 'มองรอบๆ'], ['E', 'หยิบ / วาง'], ['F', 'ไฟฉาย (แบตหมดได้)'], ['Space รัวๆ', 'กรี๊ดไล่ผี'], ['Q', 'แบนแชตผี'], ['Esc', 'พักเกม']]) {
+    const r = el('div', 'krow', grid); el('kbd', null, r, k); el('span', null, r, v);
+  }
+  el('p', 'pnote', parent, 'ถ้าอนุญาตไมค์ ตะโกนใส่ไมค์ได้เลย ระยะไม่เกิน 7 เมตร พีชชี่จะชะงักและถอยไป ส่องไฟฉายใส่ตอนเธอโกรธจะช่วยให้เธอช้าลง แนะนำให้ใส่หูฟัง');
+}
+function buildCredits(parent) {
+  const sec = (h, lines) => { el('div', 'chead', parent, h); for (const l of lines) el('div', 'cline', parent, l); };
+  sec('ตัวละคร', ['PeachiView  —  youtube.com/@PeachiView249']);
+  sec('เกมนี้', ['แฟนเกมที่ทำขึ้นเพื่อฉลองฮาโลวีน ไม่ใช่ผลงานทางการของช่อง', 'โมเดล ฉาก และเสียงทั้งหมดสร้างด้วยโค้ด']);
+  sec('เครื่องมือ', ['three.js', 'ฟอนต์ Kanit, Mitr และ Sriracha (SIL Open Font License)', 'เสียงสังเคราะห์ด้วย Web Audio']);
+  sec('ขอบคุณ', ['ผู้ชมทุกคนที่ยังไม่หลับตอนตีสาม', 'มอดทุกคนที่ทำงานฟรี']);
+}
 
-  // ---- effects layers (below HUD widgets) ----
-  E.vignette = el('div', 'fx-vignette', root);
-  E.flash = el('div', 'fx-flash', root);
-  E.crt = el('div', 'fx-crt', root);
-  const grain = makeGrain();
-  if (grain) E.crt.style.setProperty('--grain', `url(${grain})`);
+// ------------------------------------------------------------------ screens
+function buildMenu() {
+  // the menu itself lives in the 3D room (sticky notes, see menu.js); this layer only adds the footer
+  // and the notebook page that opens for how-to / settings / credits
+  const s = el('div', 'screen screen-menu');
+  el('div', 'menu-shade', s);
+  const foot = el('div', 'menu-foot', s);
+  const left = el('span', 'menu-foot-l', foot);
+  el('span', null, left, 'แฟนเกมไม่เป็นทางการ');
+  E.menuCleared = el('span', 'menu-cleared', left, 'ผ่านคืนที่ 1 แล้ว');
+  E.menuCleared.hidden = true;
+  const keys = el('span', 'menu-keys', foot);
+  el('span', null, keys, 'เลือกโน้ตบนผนัง');
+  el('kbd', null, keys, '← →'); el('kbd', null, keys, 'Enter');
+  E.menuSheet = buildSheet(s, 'menu', { howto: ['วิธีเล่น', buildHowto], settings: ['ตั้งค่า', buildSettings], credits: ['เครดิต', buildCredits] });
+  s.addEventListener('click', (e) => { if (menuPanel && !e.target.closest('.sheet')) { e.stopPropagation(); sound('back'); closePanel('menu'); } });
+  return s;
+}
+function buildSheet(parent, owner, panels) {
+  const sheet = el('aside', 'sheet', parent);
+  const inner = el('div', 'sheet-in', sheet);
+  const head = el('div', 'sheet-head', inner);
+  const title = el('h2', 'sheet-title', head);
+  const close = el('button', 'sheet-close', head, 'กลับ');
+  close.type = 'button';
+  close.addEventListener('click', () => { sound('back'); closePanel(owner); });
+  const body = el('div', 'sheet-body', inner);
+  const nodes = {};
+  for (const [id, [t, fn]] of Object.entries(panels)) { const n = el('div', 'panel-' + id, body); fn(n); n.hidden = true; nodes[id] = { node: n, title: t }; }
+  return { sheet, title, nodes };
+}
+function openPanel(owner, id) {
+  const sh = owner === 'menu' ? E.menuSheet : E.pauseSheet;
+  for (const [k, v] of Object.entries(sh.nodes)) v.node.hidden = k !== id;
+  sh.title.textContent = sh.nodes[id].title;
+  sh.sheet.classList.add('open');
+  sh.sheet.parentElement.classList.add('panel-open');
+  if (owner === 'menu') menuPanel = id; else pausePanel = id;
+}
+function closePanel(owner) {
+  const sh = owner === 'menu' ? E.menuSheet : E.pauseSheet;
+  sh.sheet.classList.remove('open');
+  sh.sheet.parentElement.classList.remove('panel-open');
+  if (owner === 'menu') menuPanel = null; else pausePanel = null;
+}
 
-  // ---- play HUD ----
-  const hud = (E.hud = el('div', 'hud-play', root));
+function buildPause() {
+  const s = el('div', 'screen screen-pause');
+  const card = el('div', 'paper pause-card', s);
+  el('h2', 'paper-title', card, 'พักเกม');
+  el('p', 'paper-sub', card, 'ไลฟ์ยังเดินอยู่ คนดูรออยู่นะ');
+  E.pauseList = menuList(card, [['resume', 'เล่นต่อ'], ['settings', 'ตั้งค่า'], ['howto', 'วิธีเล่น'], ['home', 'กลับหน้าแรก']], (id) => {
+    if (id === 'resume') fire('resume');
+    else if (id === 'home') fire('home');
+    else openPanel('pause', id);
+  });
+  E.pauseSheet = buildSheet(s, 'pause', { settings: ['ตั้งค่า', buildSettings], howto: ['วิธีเล่น', buildHowto] });
+  return s;
+}
+function buildIntro() {
+  const s = el('div', 'screen screen-intro');
+  E.introClock = el('div', 'intro-clock tnum', s, '00:00');
+  E.introTitle = el('div', 'intro-title', s, 'คืนที่ 1');
+  E.introText = el('div', 'intro-text', s, '');
+  return s;
+}
+function buildEnd(kind) {
+  const s = el('div', `screen screen-end screen-${kind}`);
+  el('div', 'end-shade', s);
+  const card = el('div', 'paper end-card', s);
+  el('div', 'stamp', card, kind === 'win' ? 'รอดแล้ว' : 'ไลฟ์จบ');
+  const title = el('h2', 'paper-title', card, '');
+  const text = el('p', 'paper-text', card, '');
+  const list = menuList(card, [['retry', kind === 'win' ? 'เล่นอีกครั้ง' : 'ลองอีกครั้ง'], ['home', 'กลับหน้าแรก']], (id) => fire(id === 'retry' ? 'retry' : 'home'));
+  E[kind] = { title, text, list };
+  return s;
+}
 
-  // top-left: clock + night + mood
+// ------------------------------------------------------------------ HUD
+function buildHud(parent) {
+  const hud = el('div', 'hud-play', parent);
+  // top-left: clock + mood
   const tl = el('div', 'hud-tl', hud);
-  const clock = el('div', 'panel clock', tl);
-  E.clock = el('div', 'clock-time', clock, '00:00 AM');
-  E.night = el('div', 'clock-night', clock, '🎃 คืนที่ 1');
-  const mood = (E.mood = el('div', 'panel mood mood-happy', tl));
-  E.moodFace = el('div', 'mood-face', mood, '😊');
-  const moodTxt = el('div', 'mood-txt', mood);
-  el('div', 'mood-name', moodTxt, 'พีชชี่ 👻');
-  E.moodLabel = el('div', 'mood-label', moodTxt, 'อารมณ์ดี');
-
+  const clock = el('div', 'clock', tl);
+  const ct = el('div', 'clock-row', clock);
+  E.clock = el('span', 'clock-time tnum', ct, '00:00');
+  el('span', 'clock-ampm', ct, 'AM');
+  E.night = el('div', 'clock-night', clock, 'คืนที่ 1');
+  const mood = (E.mood = el('div', 'mood mood-happy', tl));
+  E.moodFace = el('div', 'mood-face', mood);
+  E.moodFace.style.backgroundImage = `url(${FACE('happy')})`;
+  const mt = el('div', 'mood-txt', mood);
+  el('div', 'mood-name', mt, 'พีชชี่');
+  E.moodLabel = el('div', 'mood-label', mt, MOODS.happy.label);
   // top-center: objective + toasts
   const tc = el('div', 'hud-tc', hud);
   E.objective = el('div', 'objective', tc);
+  el('span', 'obj-tag', E.objective, 'ภารกิจ');
+  E.objText = el('span', 'obj-text', E.objective, '');
   E.objective.hidden = true;
   E.toasts = el('div', 'toasts', tc);
-
-  // top-right: LIVE + viewers, chat panel
+  // top-right: live + viewers, chat
   const tr = el('div', 'hud-tr', hud);
   const live = el('div', 'live-row', tr);
-  el('div', 'live-badge', live, '● LIVE');
-  const vw = el('div', 'viewers', live);
-  el('span', 'viewers-eye', vw, '👁');
-  E.viewers = el('span', 'viewers-n', vw, '0');
-  E.viewersDelta = el('div', 'viewers-deltas', vw);
-
-  const chat = el('div', 'chat panel', tr);
+  el('span', 'live-badge', live, 'LIVE');
+  const vw = el('span', 'viewers', live);
+  html('span', 'ico', vw, ICON.eye);
+  E.viewers = el('span', 'viewers-n tnum', vw, '0');
+  E.viewersDelta = el('span', 'viewers-deltas', vw);
+  const chat = el('div', 'chat', tr);
   const ch = el('div', 'chat-head', chat);
-  el('span', 'chat-title', ch, '💬 แชตสด');
+  html('span', 'ico', ch, ICON.chat);
+  el('span', 'chat-title', ch, 'แชตสด');
   E.spamCount = el('span', 'chat-spamcount', ch, '');
   E.chatList = el('div', 'chat-list', chat);
-  E.chatFoot = el('div', 'chat-foot', chat, 'มอด: กด Q แบนแชตผี 🔨');
-
-  // bottom-left: battery + scream
-  const bl = el('div', 'hud-bl panel', hud);
-  const bat = el('div', 'meter battery', bl);
-  const batHead = el('div', 'meter-head', bat);
-  el('span', 'meter-name', batHead, '🔦 ไฟฉาย [F]');
-  E.batPct = el('span', 'meter-val', batHead, '100%');
-  const batBar = el('div', 'bar', bat);
-  E.batFill = el('div', 'bar-fill', batBar);
-
-  const scr = (E.scream = el('div', 'meter scream', bl));
-  const scrHead = el('div', 'meter-head', scr);
-  E.scrName = el('span', 'meter-name', scrHead, '⌨ Space รัวๆ');
-  E.scrVal = el('span', 'meter-val', scrHead, 'พร้อมกรีด!');
-  const scrBar = el('div', 'bar', scr);
-  E.scrFill = el('div', 'bar-fill', scrBar);
-  E.scrThresh = el('div', 'bar-thresh', scrBar);
-
-  // center: crosshair, prompt, subtitles
+  const cf = el('div', 'chat-foot', chat);
+  el('kbd', null, cf, 'Q'); el('span', null, cf, 'แบนแชตผี');
+  // bottom-left: flashlight + scream meters
+  const bl = el('div', 'hud-bl', hud);
+  const meter = (cls, icon, name) => {
+    const m = el('div', `meter ${cls}`, bl);
+    const top = el('div', 'meter-head', m);
+    const ic = html('span', 'ico', top, icon);
+    const nm = el('span', 'meter-name', top, name);
+    const val = el('span', 'meter-val tnum', top, '');
+    const bar = el('div', 'bar', m);
+    const fill = el('div', 'bar-fill', bar);
+    return { m, ic, nm, val, bar, fill };
+  };
+  const bat = meter('battery', ICON.light, 'ไฟฉาย  F');
+  E.bat = bat; E.batFill = bat.fill; E.batPct = bat.val;
+  const scr = meter('scream', ICON.key, 'Space รัวๆ');
+  E.scr = scr; E.scrFill = scr.fill; E.scrVal = scr.val; E.scrName = scr.nm; E.scrIcon = scr.ic; E.scream = scr.m;
+  E.scrThresh = el('div', 'bar-thresh', scr.bar);
+  // center
   el('div', 'crosshair', hud);
   E.prompt = el('div', 'prompt', hud);
   E.prompt.hidden = true;
   E.subtitle = el('div', 'subtitle', hud);
   E.subtitle.hidden = true;
+  return hud;
+}
 
-  // ---- screens ----
-  E.screens = {};
-  E.screens.menu = buildMenu();
-  E.screens.intro = buildIntro();
-  E.screens.gameover = buildEnd('gameover');
-  E.screens.win = buildEnd('win');
+function build() {
+  root = el('div', 'pv-root');
+  root.dataset.screen = 'none';
+  E.vignette = el('div', 'fx-vignette', root);
+  E.flash = el('div', 'fx-flash', root);
+  E.hud = buildHud(root);
+  E.screens = { menu: buildMenu(), pause: buildPause(), intro: buildIntro(), gameover: buildEnd('gameover'), win: buildEnd('win') };
   for (const s of Object.values(E.screens)) root.appendChild(s);
-
   return root;
 }
 
-function buildMenu() {
-  const s = el('div', 'screen screen-menu');
-  const card = el('div', 'menu-card', s);
-  const top = el('div', 'menu-top', card);
-  el('span', 'live-badge', top, '● LIVE');
-  el('span', 'menu-tag', top, '🎃 Halloween Special · ตี 3');
-  E.menuTitle = el('h1', 'menu-title', card);
-  E.menuTitle.innerHTML = '<span class="t-brand">PeachiView</span><span class="t-sub">ไลฟ์ผี 249 ชั่วโมง</span>';
-  E.menuText = el('p', 'menu-blurb', card,
-    'คืนฮาโลวีน พีชชี่ลืมปิดไลฟ์แล้วเผลอหลับ… ตื่นมาอีกทีกลายเป็น "ผี" ติดอยู่ในไลฟ์ของตัวเอง! ' +
-    'คุณคือมอดมือใหม่ที่โดน DM ตอนตี 3 ให้มาช่วยดูแลไลฟ์ — หาหูฟังหูแมวของพีชชี่ แล้วเอาไปวางที่โต๊ะสตรีมให้ได้ก่อน 06:00');
-  const ctr = el('div', 'controls', card);
-  const rows = [
-    ['WASD', 'เดิน'], ['Shift', 'วิ่ง'], ['เมาส์', 'มองรอบๆ'], ['E', 'หยิบ / วาง'],
-    ['F', 'ไฟฉาย (แบตหมดได้)'], ['Space รัวๆ', 'กรีดไล่ผี'], ['Q', 'แบนแชตผี'], ['Esc', 'ปล่อยเมาส์'],
-  ];
-  for (const [k, v] of rows) {
-    const r = el('div', 'ctrl', ctr);
-    el('kbd', null, r, k);
-    el('span', null, r, v);
+// keyboard navigation for whichever list is on screen
+let menuKeys = null, menuBusy = false;
+function onKey(e) {
+  const scr = currentScreen;
+  if (scr === 'menu') {
+    if (menuPanel) { if (e.code === 'Escape') { e.preventDefault(); sound('back'); closePanel('menu'); } return; }
+    if (!menuKeys || menuBusy) return;
+    if (['ArrowRight', 'ArrowDown', 'KeyD', 'KeyS'].includes(e.code)) { e.preventDefault(); menuKeys.move(1); } else if (['ArrowLeft', 'ArrowUp', 'KeyA', 'KeyW'].includes(e.code)) { e.preventDefault(); menuKeys.move(-1); } else if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') { e.preventDefault(); menuKeys.pick(); }
+    return;
   }
-  el('p', 'menu-note', card, '🎤 ไมค์ไม่บังคับ: กดอนุญาตไมค์แล้ว "กรีดใส่ไมค์" เพื่อไล่ผีได้เลย — ไม่อนุญาตก็กด Space รัวๆ แทน · แนะนำใส่หูฟัง 🎧');
-  E.startBtn = el('button', 'btn btn-start', card, '▶ เริ่มไลฟ์');
-  E.startBtn.type = 'button';
-  E.startBtn.addEventListener('click', () => {
-    E.startBtn.blur();
-    for (const cb of startCbs) cb();
-  });
-  E.menuCleared = el('div', 'menu-cleared', card, '✓ ผ่านคืนที่ 1 แล้ว — มอดตัวจริง!');
-  E.menuCleared.hidden = true;
-  return s;
+  const list = scr === 'pause' ? E.pauseList : scr === 'gameover' ? E.gameover.list : scr === 'win' ? E.win.list : null;
+  if (!list) return;
+  const panelOpen = (scr === 'menu' && menuPanel) || (scr === 'pause' && pausePanel);
+  if (e.code === 'Escape') {
+    if (panelOpen) { e.preventDefault(); sound('back'); closePanel(scr === 'menu' ? 'menu' : 'pause'); }
+    return;
+  }
+  if (panelOpen) return;
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); list.move(1); } else if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); list.move(-1); } else if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); list.pick(); }
 }
 
-function buildIntro() {
-  const s = el('div', 'screen screen-intro');
-  E.introTitle = el('div', 'intro-title', s, 'คืนที่ 1');
-  E.introClock = el('div', 'intro-clock', s, '00:00');
-  E.introText = el('div', 'intro-text', s, 'หาหูฟังหูแมวให้พีชชี่ ก่อนตี 6…');
-  return s;
-}
-
-function buildEnd(kind) {
-  const s = el('div', `screen screen-end screen-${kind}`);
-  const card = el('div', 'end-card', s);
-  el('div', 'end-tag', card, kind === 'win' ? '🍑 STREAM SAVED' : '■ STREAM OFFLINE');
-  const title = el('h2', 'end-title', card, kind === 'win' ? 'คืนที่ 1 รอด!' : 'ไลฟ์จบแล้ว');
-  const text = el('p', 'end-text', card, '');
-  const btn = el('button', 'btn btn-retry', card, kind === 'win' ? '🔁 เล่นอีกครั้ง' : '↻ ลองอีกครั้ง');
-  btn.type = 'button';
-  btn.addEventListener('click', () => {
-    btn.blur();
-    for (const cb of retryCbs) cb();
-  });
-  E[kind] = { title, text, btn };
-  return s;
-}
-
-// ---------- animation loop (viewer count tween) ----------
+// ------------------------------------------------------------------ viewer tween
 function loop() {
   requestAnimationFrame(loop);
   if (!root) return;
@@ -217,21 +319,17 @@ function loop() {
     E.viewers.textContent = fmt(viewers.shown);
   }
 }
-
 function updateSpamCount() {
   const n = chatMsgs.filter((m) => m.type === 'spam' && !m.banned).length;
-  E.spamCount.textContent = n ? `👻 แชตผี ${n} · [Q] แบน` : '';
+  E.spamCount.textContent = n ? `แชตผี ${n}` : '';
   E.spamCount.classList.toggle('on', n > 0);
 }
-
 function removeMsg(m) {
   const i = chatMsgs.indexOf(m);
   if (i >= 0) chatMsgs.splice(i, 1);
   m.el.remove();
 }
-
 function trimChat() {
-  // drop the oldest non-spam lines first — spam stays until banned so it can still be punished
   let visible = chatMsgs.filter((m) => !m.banned).length;
   while (visible > MAX_CHAT) {
     const old = chatMsgs.find((m) => m.type !== 'spam' && !m.banned);
@@ -246,54 +344,62 @@ export const UI = {
     if (root) return;
     const host = document.getElementById('hud') || document.body;
     host.appendChild(build());
-    try {
-      if (localStorage.getItem('peachi.nightCleared')) E.menuCleared.hidden = false;
-    } catch {}
+    try { if (localStorage.getItem('peachi.nightCleared')) E.menuCleared.hidden = false; } catch {}
+    window.addEventListener('keydown', onKey);
     requestAnimationFrame(loop);
     this.showScreen('menu');
   },
 
-  onStart(cb) { if (typeof cb === 'function') startCbs.push(cb); },
-  onRetry(cb) { if (typeof cb === 'function') retryCbs.push(cb); },
+  onStart(cb) { if (typeof cb === 'function') cbs.start.push(cb); },
+  onRetry(cb) { if (typeof cb === 'function') cbs.retry.push(cb); },
+  onHome(cb) { if (typeof cb === 'function') cbs.home.push(cb); },
+  onResume(cb) { if (typeof cb === 'function') cbs.resume.push(cb); },
+  /** Title-screen hooks (the 3D sticky-note menu drives these). */
+  setMenuKeys(h) { menuKeys = h; },
+  setMenuBusy(v) { menuBusy = !!v; },
+  openMenuPanel(id) { openPanel('menu', id); },
+  menuPanelOpen() { return !!menuPanel; },
+  requestStart() { fire('start'); },
+  /** fn(kind) plays a UI sound: 'move' | 'select' | 'back' */
+  setSound(fn) { sound = typeof fn === 'function' ? fn : () => {}; },
+  get screen() { return currentScreen; },
 
   showScreen(name, data = {}) {
     if (!root) return;
     data = data || {};
+    const prev = currentScreen;
     currentScreen = name;
     root.dataset.screen = name;
     for (const [k, s] of Object.entries(E.screens)) {
       const on = k === name;
       s.classList.toggle('show', on);
-      if (on) restartAnim(s, 'enter');
+      if (on && prev !== name) restartAnim(s, 'enter');
     }
     if (document.activeElement && root.contains(document.activeElement)) document.activeElement.blur();
-
     if (name === 'menu') {
-      if (data.title) E.menuTitle.textContent = data.title;
-      if (data.text) E.menuText.textContent = data.text;
+      closePanel('menu'); menuBusy = false;
       try { E.menuCleared.hidden = !localStorage.getItem('peachi.nightCleared'); } catch {}
+    } else if (name === 'pause') {
+      closePanel('pause'); E.pauseList.reset();
     } else if (name === 'intro') {
       E.introTitle.textContent = data.title || 'คืนที่ 1';
       E.introClock.textContent = data.clock || '00:00';
-      E.introText.textContent = data.text || 'หาหูฟังหูแมวให้พีชชี่ ก่อนตี 6…';
+      E.introText.textContent = data.text || '';
     } else if (name === 'gameover' || name === 'win') {
       const d = E[name];
-      d.title.textContent = data.title || (name === 'win' ? 'คืนที่ 1 รอด!' : 'ไลฟ์จบแล้ว');
-      d.title.dataset.text = d.title.textContent;
+      d.title.textContent = data.title || (name === 'win' ? 'รอดคืนที่ 1' : 'ไลฟ์จบแล้ว');
       d.text.textContent = data.text || '';
-      if (name === 'win') {
-        try { E.menuCleared.hidden = !localStorage.getItem('peachi.nightCleared'); } catch {}
-      }
+      d.list.reset();
     }
-    if (name !== 'play') { this.setPrompt(null); }
+    if (name !== 'play') this.setPrompt(null);
   },
 
   setClock(hour, minute = 0) {
     if (!root) return;
-    const txt = `${pad(hour)}:${pad(minute)} AM`;
+    const txt = `${pad(hour)}:${pad(minute)}`;
     if (E.clock.textContent !== txt) {
       E.clock.textContent = txt;
-      E.clock.parentElement.classList.toggle('dawn', hour >= 5);
+      E.clock.closest('.clock').classList.toggle('dawn', hour >= 5);
     }
   },
 
@@ -302,14 +408,10 @@ export const UI = {
     n = Math.max(0, Math.round(Number(n) || 0));
     const prev = viewers.target;
     if (n === prev) return;
-    viewers.from = viewers.shown;
-    viewers.target = n;
-    viewers.t0 = now();
+    viewers.from = viewers.shown; viewers.target = n; viewers.t0 = now();
     const vw = E.viewers.parentElement;
     const cls = n > prev ? 'up' : 'down';
-    vw.classList.remove('up', 'down');
-    void vw.offsetWidth;
-    vw.classList.add(cls);
+    vw.classList.remove('up', 'down'); void vw.offsetWidth; vw.classList.add(cls);
     clearTimeout(vw._t);
     vw._t = setTimeout(() => vw.classList.remove('up', 'down'), 900);
     vw.classList.toggle('danger', n > 0 && n < 50);
@@ -324,7 +426,7 @@ export const UI = {
     const p = Math.max(0, Math.min(100, Number(pct) || 0));
     E.batFill.style.width = `${p}%`;
     E.batPct.textContent = `${Math.ceil(p)}%`;
-    const b = E.batFill.closest('.battery');
+    const b = E.bat.m;
     b.classList.toggle('mid', p <= 50 && p > 20);
     b.classList.toggle('low', p <= 20 && p > 0);
     b.classList.toggle('empty', p <= 0);
@@ -334,23 +436,25 @@ export const UI = {
     if (!root) return;
     const x = Math.max(0, Math.min(1, Number(v) || 0));
     E.scrFill.style.width = `${x * 100}%`;
-    E.scrName.textContent = usingMic ? '🎤 ไมค์ · กรีดเลย!' : '⌨ Space รัวๆ';
-    E.scream.classList.toggle('mic', !!usingMic);
+    if (E.scream._mic !== !!usingMic) {
+      E.scream._mic = !!usingMic;
+      E.scrName.textContent = usingMic ? 'ไมค์  ตะโกนเลย' : 'Space รัวๆ';
+      E.scrIcon.innerHTML = usingMic ? ICON.mic : ICON.key;
+    }
     const cd = cooldownSec > 0.05;
     E.scream.classList.toggle('cooldown', cd);
     E.scream.classList.toggle('hot', !cd && x >= (usingMic ? 0.5 : 0.75));
-    E.scrVal.textContent = cd ? `พักเสียง ${cooldownSec.toFixed(1)}s` : 'พร้อมกรีด!';
+    E.scrVal.textContent = cd ? `พักเสียง ${cooldownSec.toFixed(1)} วิ` : 'พร้อม';
   },
 
   setMood(name) {
     if (!root) return;
-    const m = MOODS[name] || MOODS.happy;
     const key = MOODS[name] ? name : 'happy';
     if (E.mood.dataset.mood === key) return;
     E.mood.dataset.mood = key;
-    E.mood.className = `panel mood mood-${key}`;
-    E.moodFace.textContent = m.emoji;
-    E.moodLabel.textContent = m.label;
+    E.mood.className = `mood mood-${key}`;
+    E.moodFace.style.backgroundImage = `url(${FACE(MOODS[key].face)})`;
+    E.moodLabel.textContent = MOODS[key].label;
     restartAnim(E.mood, 'pop');
   },
 
@@ -359,8 +463,7 @@ export const UI = {
     if (!text) { E.prompt.hidden = true; E.prompt._txt = null; return; }
     if (E.prompt._txt === text && !E.prompt.hidden) return;
     E.prompt._txt = text;
-    let key = 'E';
-    let label = String(text);
+    let key = 'E', label = String(text);
     const m = label.match(/^\s*\[([^\]]+)\]\s*(.*)$/);
     if (m) { key = m[1]; label = m[2]; }
     E.prompt.replaceChildren();
@@ -372,8 +475,9 @@ export const UI = {
   setObjective(text) {
     if (!root) return;
     if (!text) { E.objective.hidden = true; return; }
-    if (E.objective.textContent === `🎯 ${text}` && !E.objective.hidden) return;
-    E.objective.textContent = `🎯 ${text}`;
+    const t = String(text).replace(/"/g, '');
+    if (E.objText.textContent === t && !E.objective.hidden) return;
+    E.objText.textContent = t;
     E.objective.hidden = false;
     restartAnim(E.objective, 'pulse');
   },
@@ -381,22 +485,20 @@ export const UI = {
   toast(text) {
     if (!root) return;
     const t = el('div', 'toast', E.toasts, text);
-    while (E.toasts.children.length > 4) E.toasts.firstChild.remove();
+    while (E.toasts.children.length > 3) E.toasts.firstChild.remove();
     setTimeout(() => t.classList.add('out'), 2600);
     setTimeout(() => t.remove(), 3100);
   },
 
   subtitle(text, ms = 3000) {
     if (!root) return;
-    clearTimeout(subTimer);
-    clearInterval(subType);
+    clearTimeout(subTimer); clearInterval(subType);
     if (!text) { E.subtitle.hidden = true; return; }
     E.subtitle.replaceChildren();
     el('span', 'sub-name', E.subtitle, 'พีชชี่');
     const body = el('span', 'sub-text', E.subtitle, '');
     E.subtitle.hidden = false;
     restartAnim(E.subtitle, 'in');
-    // quick typewriter
     const chars = Array.from(String(text));
     let i = 0;
     subType = setInterval(() => {
@@ -415,14 +517,13 @@ export const UI = {
         line.classList.add(scTier(amount));
         const head = el('div', 'sc-head', line);
         el('span', 'sc-user', head, user);
-        el('span', 'sc-amount', head, `฿${fmt(amount)}`);
+        el('span', 'sc-amount tnum', head, `฿${fmt(amount)}`);
         el('div', 'sc-text', line, text);
       } else {
-        const u = el('span', 'chat-user', line, type === 'spam' ? `👻 ${user}` : user);
+        const u = el('span', 'chat-user', line, user);
         if (type !== 'spam') u.style.color = userColor(user);
         el('span', 'chat-text', line, text);
         if (type === 'spam') {
-          el('span', 'spam-hint', line, '[Q] แบน');
           const timer = el('div', 'spam-timer', line);
           timer.style.animationDuration = `${SPAM_TTL_HINT}s`;
         }
@@ -435,33 +536,27 @@ export const UI = {
       E.chatList.scrollTop = E.chatList.scrollHeight;
       return line;
     },
-
     banOldestSpam() {
       if (!root) return false;
       const m = chatMsgs.find((x) => x.type === 'spam' && !x.banned);
       if (!m) return false;
       m.banned = true;
       m.el.classList.add('banned');
-      const stamp = el('span', 'ban-stamp', m.el, '🔨 BANNED');
-      stamp.setAttribute('aria-hidden', 'true');
+      el('span', 'ban-stamp', m.el, 'แบนแล้ว');
       updateSpamCount();
       setTimeout(() => removeMsg(m), 700);
       return true;
     },
-
     spamAges() {
       const t = now();
       return chatMsgs.filter((m) => m.type === 'spam' && !m.banned).map((m) => (t - m.t0) / 1000);
     },
-
-    // extra: remove spam older than maxAge seconds (after it has been punished) → count removed
     expireSpam(maxAge = SPAM_TTL_HINT) {
       const t = now();
       let n = 0;
       for (const m of chatMsgs.slice()) {
         if (m.type === 'spam' && !m.banned && (t - m.t0) / 1000 > maxAge) {
-          m.banned = true;
-          m.el.classList.add('expired');
+          m.banned = true; m.el.classList.add('expired');
           setTimeout(() => removeMsg(m), 600);
           n++;
         }
@@ -469,8 +564,6 @@ export const UI = {
       if (n) updateSpamCount();
       return n;
     },
-
-    // extra: wipe chat (retry)
     clear() {
       for (const m of chatMsgs) m.el.remove();
       chatMsgs = [];
@@ -479,7 +572,7 @@ export const UI = {
   },
 
   flash(color = '#fff') {
-    if (!root) return;
+    if (!root || Settings.get().calm) return;
     E.flash.style.background = color;
     restartAnim(E.flash, 'go');
   },
@@ -487,6 +580,7 @@ export const UI = {
   shake(ms = 400) {
     const app = document.getElementById('app');
     if (!app) return;
+    if (Settings.get().calm) ms = Math.min(ms, 160);
     app.style.setProperty('--shake-ms', `${Math.max(50, ms)}ms`);
     restartAnim(app, 'pv-shake');
     clearTimeout(app._shakeT);

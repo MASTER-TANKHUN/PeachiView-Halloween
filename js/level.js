@@ -149,6 +149,6 @@ export function buildLevel(scene) {
     setFlicker(on) { flicker = !!on; if (!flicker) flickM = 1; },
     update,
     // extras (not part of the contract)
-    scene, root, colliders: boxes, rooms: PLAN.rooms, roomAt, meshes, materials: M, moon, V,
+    scene, root, colliders: boxes, rooms: PLAN.rooms, roomAt, meshes, materials: M, moon, V, screens: rooms.screens,
   };
 }

@@ -38,6 +38,7 @@ export function furnish(kit, M, root, plan) {
 
   const lights = [], points = { itemSpots: [], ghostSpawns: [], navPoints: [] };
   let deskPosition = null, spawn = null;
+  const screens = {};
   for (const r of rooms) {
     lights.push(...r.lights);
     points.itemSpots.push(...(r.itemSpots || []));
@@ -45,8 +46,9 @@ export function furnish(kit, M, root, plan) {
     points.ghostSpawns.push(...(r.ghostSpawns || []));
     if (r.deskPosition) deskPosition = r.deskPosition;
     if (r.spawn) spawn = r.spawn;
+    if (r.screens) Object.assign(screens, r.screens);
   }
   points.deskPosition = deskPosition;
   points.spawn = spawn;
-  return { lights, points, update(dt, t, flick) { for (const r of rooms) r.update && r.update(dt, t, flick); } };
+  return { lights, points, screens, update(dt, t, flick) { for (const r of rooms) r.update && r.update(dt, t, flick); } };
 }

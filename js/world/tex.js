@@ -341,13 +341,15 @@ export function wallpaper(kind, seed = 19) {
 }
 
 // ---------------------------------------------------------------- one-off art (not tiling)
+// every face/weight the canvas art uses (Thai + Latin subsets load separately, hence the sample text)
+export const FONT_SPECS = ['400 40px Kanit', '500 40px Kanit', '600 40px Kanit', '700 40px Kanit', '800 40px Kanit', '400 40px Mitr', '500 40px Mitr', '600 40px Mitr', '400 40px Sriracha'];
 /** Draw a picture into a canvas texture (for posters, screens, rugs…). Redraws once the Thai fonts load. */
 export function art(w, h, draw, { fonts = true } = {}) {
   const [c, g] = canvas(w, h);
   draw(g, w, h);
   const t = toTexture(c, { repeat: false });
   if (fonts && document.fonts && document.fonts.load) {
-    Promise.all([document.fonts.load('700 40px Kanit'), document.fonts.load('600 40px Mitr')])
+    Promise.all(FONT_SPECS.map((f) => document.fonts.load(f, 'กขA')))
       .then(() => { g.clearRect(0, 0, w, h); draw(g, w, h); t.needsUpdate = true; })
       .catch(() => {});
   }
