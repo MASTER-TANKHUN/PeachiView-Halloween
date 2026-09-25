@@ -19,8 +19,8 @@ const C = {
   skin: SKIN_ART, navel: 0xde9a92, white: 0xfbf8fd, lav: 0xece6fb, pink: 0xff8cbf, pinkDeep: 0xef5f9f,
   pinkPale: 0xffd0e4, coral: 0xf2566f, ink: 0x221f30, inkSoft: 0x2e2a42, gold: 0xebbd52, sock: 0x221f2d,
 };
-const HAIR = ['#431c15', '#5f261d', '#833226', '#b84b5a', '#e8718f', '#f59cba'].map((c) => new THREE.Color(c));
-const _hc = new THREE.Color(), _ring = new THREE.Color('#9b5a4a');
+const HAIR = ['#2e1412', '#6e312c', '#8e3f39', '#b84b5a', '#e8718f', '#f59cba'].map((c) => new THREE.Color(c));
+const _hc = new THREE.Color(), _ring = new THREE.Color('#9b5a4a'), BANG_TIP = new THREE.Color('#c26a60');
 
 /** Hair color by height (the sheet's gradient is dark brown at the crown → pink below the chest). */
 function hairColorAt(y, out, ring = 0) {
@@ -41,7 +41,10 @@ const HC = V(0, 1.485, 0.008);                 // cranium center
 const SHOULDER = V(0.118, 1.292, -0.01);
 const HIP_J = V(0.07, 0.865, 0);
 const UPPER = 0.255, FORE = 0.225, THIGH = 0.36, SHIN = 0.41;
-export const FACE_HEIGHT = 1.425;
+// The head (and everything on it) is authored at the heights below and then lifted this much on the neck,
+// so a bit of neck shows between the chin and the choker as on the sheet.
+const NECK_LIFT = 0.014;
+export const FACE_HEIGHT = 1.425 + NECK_LIFT;
 
 // ---------------------------------------------------------------- body shapes
 const TORSO = [
@@ -85,19 +88,20 @@ function jacketPoint(th, y, off, out) {
 }
 
 // Anime head built from horizontal rings (world Y), tuned to the sheet's face measured in eye spacings
-// E (0.069 m): face half-width 0.91E at the eyes, 0.76E at the cheeks, 0.63E at the mouth, 0.31E just
+// E (0.069 m): face half-width 0.96E at the eyes, 0.8E at the cheeks, 0.63E at the mouth, 0.31E just
 // below it, then a short rounded chin 1.18E under the eye line (a U/V-line jaw, not a long triangle).
 // Wf = half-width of the face (front half), Wb = half-width of the skull behind it (hidden by hair/cups),
 // zF / zB = frontmost / rearmost z of the ring.
 const HEAD_RINGS = [
-  { k: 1.3635, Wf: 0.0, Wb: 0.0, zF: 0.052, zB: 0.04 },
-  { k: 1.369, Wf: 0.009, Wb: 0.012, zF: 0.061, zB: 0.022 },
-  { k: 1.376, Wf: 0.022, Wb: 0.028, zF: 0.069, zB: -0.004 },
-  { k: 1.386, Wf: 0.0365, Wb: 0.045, zF: 0.077, zB: -0.034 },
+  { k: 1.3635, Wf: 0.0, Wb: 0.0, zF: 0.057, zB: 0.04 },
+  { k: 1.369, Wf: 0.009, Wb: 0.012, zF: 0.065, zB: 0.022 },
+  { k: 1.376, Wf: 0.022, Wb: 0.028, zF: 0.072, zB: -0.004 },
+  { k: 1.386, Wf: 0.0365, Wb: 0.045, zF: 0.079, zB: -0.034 },
   { k: 1.4, Wf: 0.047, Wb: 0.057, zF: 0.083, zB: -0.058 },
   { k: 1.41, Wf: 0.05, Wb: 0.063, zF: 0.085, zB: -0.07 },
-  { k: 1.422, Wf: 0.0535, Wb: 0.068, zF: 0.087, zB: -0.08 },
-  { k: 1.447, Wf: 0.062, Wb: 0.076, zF: 0.089, zB: -0.092 },
+  { k: 1.422, Wf: 0.055, Wb: 0.068, zF: 0.087, zB: -0.08 },
+  { k: 1.435, Wf: 0.0605, Wb: 0.072, zF: 0.088, zB: -0.086 },
+  { k: 1.447, Wf: 0.066, Wb: 0.076, zF: 0.089, zB: -0.092 },
   { k: 1.475, Wf: 0.069, Wb: 0.079, zF: 0.089, zB: -0.098 },
   { k: 1.505, Wf: 0.073, Wb: 0.079, zF: 0.086, zB: -0.098 },
   { k: 1.535, Wf: 0.069, Wb: 0.074, zF: 0.077, zB: -0.09 },
@@ -115,9 +119,12 @@ function headPoint(u, v, o) {
   const R = tableLerp(HEAD_RINGS, y, _hr);
   const s = Math.sin(th), c = Math.cos(th);
   const W = lerp(R.Wb, R.Wf, smooth(-0.35, 0.35, c));
-  const x = W * s;
-  // flat anime face plane in front, round skull behind
-  let z = c >= 0 ? R.zF * c * (1 + 0.35 * (1 - c)) : -R.zB * c;
+  // Front half: a superellipse, flat across the eyes and turning at the cheeks (a round front puts the
+  // outer eye corners on a surface facing sideways and the drawn eyes smear as the head turns).
+  // Rounder at the chin and over the crown; the skull behind stays elliptical.
+  const e = c >= 0 ? lerp(lerp(0.85, 0.55, smooth(1.366, 1.395, y)) - 0.12 * Math.exp(-(((y - 1.452) / 0.02) ** 2)), 0.85, smooth(1.5, 1.565, y)) : 1;
+  const x = W * Math.sign(s) * Math.pow(Math.abs(s), e);
+  let z = c >= 0 ? R.zF * Math.pow(c, e) : -R.zB * c;
   z += 0.006 * Math.exp(-((x / 0.0065) ** 2)) * Math.exp(-(((y - 1.428) / 0.011) ** 2)) * smooth(0.8, 1, c); // small nose
   return o.set(x, y, z + HC.z);
 }
@@ -126,6 +133,17 @@ function headAt(az, pol, off, out = V()) {
   headPoint(0.5 + az / TAU, pol / PI, out);
   _hd.copy(out).sub(HC).normalize();
   return out.addScaledVector(_hd, off);
+}
+// point on the front of the head at world height y with the given x (bangs are laid out on the face this way)
+function headAtXY(x, y, off, out = V()) {
+  const v = y >= HC.y ? Math.acos(Math.min(1, (y - HC.y) / 0.1)) / PI : 0.5 + Math.asin(Math.min(1, (HC.y - y) / (HC.y - 1.3635))) / PI;
+  let lo = -PI / 2, hi = PI / 2;
+  for (let i = 0; i < 30; i++) {
+    const m = (lo + hi) / 2;
+    headPoint(0.5 + m / TAU, v, out);
+    if (out.x < x) lo = m; else hi = m;
+  }
+  return headAt((lo + hi) / 2, v * PI, off, out);
 }
 const _o1 = V(), _o2 = V();
 function hairOutward(t, p, out) {
@@ -175,12 +193,6 @@ function buildHeadphones(add, atlas) {
   }, 12, 44, { color });
   add('solid', band(0.0, 0.012, 0.0125, C.pink));
   add('solid', band(-0.007, 0.001, 0.0095, C.lav), { outline: 0.6 });
-  // pink segment ridges on the band (the sheet's band is built from plates)
-  for (const a of [-1.2, -0.95, 0.95, 1.2]) {
-    const g = new THREE.BoxGeometry(0.02, 0.006, 0.028);
-    place(g, arc(a, 0.012, V()).toArray(), [0, 0, -a]);
-    add('solid', g, { color: C.pinkDeep, outline: 0.5 });
-  }
   for (const s of [-1, 1]) {
     // slider + yoke
     add('solid', extrude(roundRectShape(0.016, 0.03, 0.005), 0.022, 0.004), { pos: [s * 0.104, -0.002, zB], color: C.pink });
@@ -268,6 +280,7 @@ export function buildPeachi({ ghost = true } = {}) {
   const hips = joint(root, HIPS_O);
   const torso = joint(root, TORSO_O);
   const head = joint(torso, HEAD_O);
+  head.position.y += NECK_LIFT;
 
   const bin = new PartBin();
   const W = (grp, key, geo, opts = {}) => {
@@ -311,13 +324,13 @@ export function buildPeachi({ ghost = true } = {}) {
     W(head, 'hair', g, { outline: 1 });
   }
   let hairSeed = 3;
-  const hairPiece = (pts, { w, d = 0.006, amp = 0.01, phase = 0, curl = 0.3, nv = 14, nu = 6, ringY = 1.545, shape = 'bang' }) => {
+  const hairPiece = (pts, { w, d = 0.006, amp = 0.01, phase = 0, curl = 0.3, nv = 14, nu = 6, ringY = 1.545, shape = 'lock', tip = 0 }) => {
     hairSeed = (hairSeed * 16807) % 2147483647;
-    const tone = 0.92 + 0.14 * (hairSeed / 2147483647);
+    const tone = 0.86 + 0.2 * (hairSeed / 2147483647);
     const path = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
-    // w is the half-width. 'front' locks stay slim beside the face and fan out over the shoulders/chest.
-    const width = shape === 'bang'
-      ? (t) => w * (0.82 + 0.3 * t) * Math.pow(1 - Math.pow(t, 5), 0.85)
+    // w is the half-width. 'point' = bang lock with a sharp tip; 'front' locks stay slim beside the face and fan out over the shoulders/chest.
+    const width = shape === 'point'
+      ? (t) => w * (0.75 + 0.25 * smooth(0, 0.3, t)) * Math.pow(1 - smooth(0.45, 1, t), 0.7)
       : shape === 'front'
         ? (t) => w * (0.24 + 0.9 * smooth(0.34, 0.66, t)) * (1 - Math.pow(t, 3.2))
         : (t) => w * (0.62 + 0.55 * Math.sin(PI * Math.min(1, t * 1.15)) ** 0.6) * (1 - Math.pow(t, 3.2));
@@ -326,42 +339,58 @@ export function buildPeachi({ ghost = true } = {}) {
       color: (u, v, p, c) => {
         const ph = u * TAU, cw = Math.abs(Math.cos(ph)), sn = Math.sin(ph);
         hairColorAt(p.y, c, 0.45 * Math.exp(-(((p.y - ringY) / 0.009) ** 2)));
-        return c.multiplyScalar(tone * (1 - 0.3 * cw * cw * cw) * (sn < 0 ? 0.78 : 1));
+        if (tip) c.lerp(BANG_TIP, tip * smooth(0.4, 1, v)); // bang tips warm up toward the skin, as painted
+        return c.multiplyScalar(tone * (1 - 0.42 * cw * cw * cw * cw) * (sn < 0 ? 0.72 : 1));
       },
       sway: (u, v) => [amp * Math.pow(v, 1.7), phase],
     });
     W(head, 'hair', g, { outline: 1 });
   };
-  // ---- bangs [azimuth°, end polar (×π), width]: heavy, cut at the brows, one lock between the eyes
-  { // under-layer so no forehead shows between the locks
+  // ---- bangs, cut like the sheet: pointed locks of uneven length from a part just off the middle.
+  // The middle ones meet between the eyes, the sides sweep out to the temples, and a little forehead
+  // (with the brows, see face.js) shows through a gap on each side.
+  { // under-layer: fills the roots so no scalp shows between the locks; short over the two gaps
+    const endAt = (deg) => 0.365 + 0.115 * Math.exp(-(((deg - 3) / 11) ** 2)) + 0.19 * smooth(52, 80, Math.abs(deg));
     const g = surface((u, v, o) => {
-      const az = lerp(-78, 78, u) * DEG;
-      headAt(az, lerp(0.16, 0.5 + 0.08 * Math.pow(Math.abs(u - 0.5) * 2, 2), v) * PI, 0.0075, o);
-    }, 16, 6, { flip: true, color: (u, v, p, c) => hairColorAt(p.y, c).multiplyScalar(0.8) });
+      const deg = lerp(-84, 84, u);
+      headAt(deg * DEG, lerp(0.16, endAt(deg), v) * PI, 0.0072, o);
+    }, 28, 6, { flip: true, color: (u, v, p, c) => hairColorAt(p.y, c).multiplyScalar(0.55) });
     W(head, 'hair', g, { outline: 0 });
   }
-  const BANGS = [[-74, 0.73, 0.013], [-61, 0.61, 0.022], [-47, 0.56, 0.034], [-34, 0.54, 0.034], [-22, 0.548, 0.034], [-10, 0.535, 0.034],
-    [2, 0.59, 0.012], [12, 0.535, 0.034], [25, 0.546, 0.034], [37, 0.536, 0.034], [49, 0.553, 0.034], [61, 0.61, 0.022], [74, 0.73, 0.013]];
-  BANGS.forEach(([deg, end, w], i) => {
-    const az = deg * DEG, off = i % 2 ? 0.0135 : 0.0115;
-    hairPiece([
-      headAt(az * 0.3, 0.05 * PI, off), headAt(az * 0.72, 0.22 * PI, off + 0.004), headAt(az * 0.94, 0.4 * PI, off + 0.005),
-      headAt(az, (end - 0.07) * PI, off + 0.001), headAt(az * 1.03, end * PI, off - 0.004),
-    ], { w, d: 0.0065, amp: 0.004, phase: i * 1.3, curl: 0.3 });
+  // [half width, offset from the skin, root [azimuth°, polar ×π], then [x, y] over the forehead]; later ones lie on top
+  const BANGS = [
+    [0.02, 0.0095, [0, 0.05], [[-0.02, 1.567], [-0.05, 1.545], [-0.068, 1.51], [-0.074, 1.478], [-0.073, 1.45]]],   // outer sweeps
+    [0.02, 0.0095, [18, 0.05], [[0.034, 1.567], [0.058, 1.545], [0.07, 1.51], [0.075, 1.478], [0.073, 1.45]]],
+    [0.018, 0.0105, [6, 0.06], [[-0.006, 1.56], [-0.028, 1.538], [-0.048, 1.508], [-0.06, 1.482], [-0.064, 1.458]]], // inner sweeps
+    [0.018, 0.0105, [14, 0.06], [[0.02, 1.56], [0.036, 1.538], [0.053, 1.508], [0.063, 1.482], [0.066, 1.458]]],
+    [0.016, 0.0115, [4, 0.07], [[-0.006, 1.555], [-0.012, 1.525], [-0.02, 1.495], [-0.029, 1.472]]],               // middle, tips fanning out
+    [0.016, 0.0115, [15, 0.07], [[0.014, 1.555], [0.019, 1.525], [0.024, 1.498], [0.03, 1.477]]],
+    [0.017, 0.012, [7, 0.07], [[-0.002, 1.555], [-0.006, 1.52], [-0.009, 1.49], [-0.013, 1.465]]],
+    [0.016, 0.012, [12, 0.07], [[0.011, 1.555], [0.012, 1.52], [0.013, 1.495], [0.015, 1.47]]],
+    [0.018, 0.0125, [9, 0.07], [[0.005, 1.555], [0.003, 1.52], [0.0, 1.49], [0.001, 1.457]]],
+    [0.006, 0.013, [0, 0.2], [[-0.022, 1.535], [-0.035, 1.505], [-0.041, 1.485], [-0.044, 1.465]]],                       // loose strands
+    [0.006, 0.0125, [-40, 0.28], [[-0.05, 1.53], [-0.06, 1.5], [-0.066, 1.47], [-0.068, 1.44]]],
+    [0.006, 0.0125, [40, 0.28], [[0.05, 1.53], [0.06, 1.5], [0.066, 1.47], [0.068, 1.44]]],
+  ];
+  BANGS.forEach(([w, off, [rDeg, rPol], path], i) => {
+    const n = path.length;
+    const pts = [headAt(rDeg * DEG, rPol * PI, off)];
+    path.forEach(([x, y], j) => pts.push(headAtXY(x, y, off + 0.002 * Math.sin(PI * (j + 1) / n) - (j === n - 1 ? 0.003 : 0))));
+    hairPiece(pts, { w, d: w < 0.008 ? 0.003 : 0.005, amp: 0.003, phase: i * 1.3, curl: 0.25, nv: 16, shape: 'point', tip: 0.55 });
   });
   // ---- front hair: locks tucked under the headphone cups that come out below them and fall
   // in front of the shoulders, over the collar and the upper sleeves (the face stays clear from the side)
   for (const s of [-1, 1]) {
     // inner lock over the chest
     hairPiece([
-      headAt(s * 52 * DEG, 0.2 * PI, 0.014), headAt(s * 62 * DEG, 0.44 * PI, 0.02), V(s * 0.071, 1.45, 0.03),
-      V(s * 0.074, 1.4, 0.028), V(s * 0.077, 1.36, 0.036), V(s * 0.084, 1.31, 0.047), V(s * 0.1, 1.265, 0.05), V(s * 0.086, 1.205, 0.058),
+      headAt(s * 52 * DEG, 0.2 * PI, 0.014), headAt(s * 62 * DEG, 0.44 * PI, 0.02), V(s * 0.077, 1.45, 0.03),
+      V(s * 0.077, 1.4, 0.028), V(s * 0.077, 1.36, 0.036), V(s * 0.084, 1.31, 0.047), V(s * 0.1, 1.265, 0.05), V(s * 0.086, 1.205, 0.058),
       V(s * 0.104, 1.15, 0.058), V(s * 0.126, 1.105, 0.052), V(s * 0.14, 1.08, 0.046),
     ], { w: 0.034, d: 0.012, amp: 0.012, phase: s * 2.1, curl: 0.25, nv: 26, shape: 'front' });
     // wide lock over the shoulder front and the upper sleeve, curling outward
     hairPiece([
-      headAt(s * 72 * DEG, 0.17 * PI, 0.013), headAt(s * 80 * DEG, 0.42 * PI, 0.024), V(s * 0.078, 1.43, 0.006),
-      V(s * 0.088, 1.37, 0.02), V(s * 0.124, 1.315, 0.042), V(s * 0.158, 1.26, 0.062), V(s * 0.16, 1.2, 0.074),
+      headAt(s * 72 * DEG, 0.17 * PI, 0.013), headAt(s * 80 * DEG, 0.42 * PI, 0.024), V(s * 0.083, 1.43, 0.006),
+      V(s * 0.089, 1.37, 0.02), V(s * 0.124, 1.315, 0.042), V(s * 0.158, 1.26, 0.062), V(s * 0.16, 1.2, 0.074),
       V(s * 0.184, 1.15, 0.078), V(s * 0.21, 1.11, 0.074), V(s * 0.234, 1.085, 0.064), V(s * 0.25, 1.07, 0.056),
     ], { w: 0.044, d: 0.015, amp: 0.016, phase: s * 3.3, curl: 0.22, nu: 8, nv: 26, shape: 'front' });
     // outer lock: behind the cup, then spilling over the shoulder in an S-wave
@@ -372,8 +401,8 @@ export function buildPeachi({ ghost = true } = {}) {
     ], { w: 0.042, d: 0.014, amp: 0.018, phase: s * 4.1, curl: 0.22, nu: 8, nv: 24, shape: 'front' });
     // a thinner wisp between them for a layered edge
     hairPiece([
-      headAt(s * 64 * DEG, 0.24 * PI, 0.015), headAt(s * 70 * DEG, 0.48 * PI, 0.022), V(s * 0.074, 1.43, 0.018),
-      V(s * 0.08, 1.37, 0.03), V(s * 0.1, 1.3, 0.05), V(s * 0.12, 1.235, 0.062), V(s * 0.118, 1.18, 0.066),
+      headAt(s * 64 * DEG, 0.24 * PI, 0.015), headAt(s * 70 * DEG, 0.48 * PI, 0.022), V(s * 0.08, 1.43, 0.018),
+      V(s * 0.082, 1.37, 0.03), V(s * 0.1, 1.3, 0.05), V(s * 0.12, 1.235, 0.062), V(s * 0.118, 1.18, 0.066),
     ], { w: 0.022, d: 0.009, amp: 0.014, phase: s * 1.2, curl: 0.25, nv: 22, shape: 'front' });
   }
   // ---- back hair: behind the cups and shoulders; long and wavy at the sides, ending at the hood in the middle.
@@ -721,7 +750,7 @@ export function buildPeachi({ ghost = true } = {}) {
   anger.position.copy(HC).sub(HEAD_O).add(V(0.068, 0.07, 0.07));
   anger.scale.setScalar(0.06); anger.visible = false; head.add(anger);
   const faceAnchor = new THREE.Object3D(); faceAnchor.name = 'faceAnchor';
-  faceAnchor.position.set(0, FACE_HEIGHT - HEAD_O.y, 0.08 - HEAD_O.z); head.add(faceAnchor);
+  faceAnchor.position.set(0, FACE_HEIGHT - NECK_LIFT - HEAD_O.y, 0.08 - HEAD_O.z); head.add(faceAnchor);
 
   const animator = createAnimator({ root, hips, torso, head, arms, legs }, { ghost, U });
   const _s = V();

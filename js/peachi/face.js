@@ -407,6 +407,39 @@ function requestArt() {
     img.src = new URL(`../../assets/peachi/face_${name}.webp`, import.meta.url).href;
   }
 }
+// Brows for the drawn faces. The sheet paints them over the bangs; here they go on the face and on the
+// see-through overlay. Measured on the aligned sheet faces (canvas px), her left brow, inner → outer end.
+const ART_BROWS = {
+  happy: [[647, 70], [712, 58], [790, 76], [862, 108]],
+  cry: [[640, 108], [705, 118], [775, 148], [842, 188]],
+  angry: [[636, 288], [700, 252], [765, 200], [832, 160]],
+  scream: [[660, 32], [728, 18], [800, 46], [862, 96]],
+};
+function drawArtBrows(ctx, name, scale = 1) {
+  const P = ART_BROWS[name] || ART_BROWS.happy;
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.fillStyle = '#2b120e';
+  for (const side of [-1, 1]) {
+    const Q = P.map(([x, y]) => [CX + side * (x - CX), y]);
+    const at = (t) => bez(Q[0], Q[1], Q[2], Q[3], Math.min(1, Math.max(0, t)));
+    // tapered brush stroke, thickest a third of the way out from the inner end
+    const top = [], bot = [];
+    for (let i = 0; i <= 24; i++) {
+      const t = i / 24, [x, y] = at(t), a = at(t - 0.01), b = at(t + 0.01);
+      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+      const hw = 5.5 * Math.pow(Math.sin(Math.PI * (0.12 + 0.86 * t)), 0.7) * (1 - 0.35 * t);
+      top.push([x - dy / l * hw, y + dx / l * hw]);
+      bot.push([x + dy / l * hw, y - dx / l * hw]);
+    }
+    ctx.beginPath();
+    top.forEach((q, i) => (i ? ctx.lineTo(...q) : ctx.moveTo(...q)));
+    bot.reverse().forEach((q) => ctx.lineTo(...q));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
 // blink on top of the drawn face: skin over the open eye, then a closed lash line
 function drawArtBlink(ctx) {
   for (const side of [-1, 1]) {
@@ -450,9 +483,11 @@ export function createFace() {
     const img = art[expression];
     if (img) {
       ctx.clearRect(0, 0, S, S); ctx.drawImage(img, 0, 0, S, S);
+      drawArtBrows(ctx, expression);
       if (blinking) drawArtBlink(ctx);
       octx.clearRect(0, 0, S / 2, S / 2);
       if (!blinking) { octx.drawImage(img, 0, 0, S / 2, S / 2); eyesOnlyMask(octx, 0.5); }
+      drawArtBrows(octx, expression, 0.5);
     } else { // until the art has loaded: the painted fallback face
       drawFace(ctx, expression, { blink: blinking });
       drawFace(octx, expression, { blink: blinking, size: S / 2, eyesOnly: true });

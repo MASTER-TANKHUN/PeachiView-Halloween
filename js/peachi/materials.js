@@ -179,10 +179,13 @@ export function toonMaterial(U, params = {}, flags = {}) {
           float sl = abs(fract(sx) - 0.5);
           float line = 1.0 - smoothstep(0.035, 0.035 + fw * 1.5, sl);
           diffuseColor.rgb *= 1.0 - 0.2 * line * (1.0 - smoothstep(0.15, 0.4, fw));
-          // angel ring: a glossy band that stays on the crown as the view turns (matcap-like, view-space normal)
+          // angel ring: a glossy band that stays on the crown as the view turns (matcap-like, view-space normal),
+          // in the hair's own warm color and broken per strand into jagged tips like the painted one
           vec3 nvw = normalize(normal);
-          float ringB = smoothstep(0.16, 0.26, nvw.y) * (1.0 - smoothstep(0.4, 0.52, nvw.y)) * smoothstep(0.1, 0.13, vLocalP.y) * step(0.0, nvw.z);
-          totalEmissiveRadiance += vec3(1.0, 0.84, 0.78) * ringB * (0.26 - 0.12 * line);` : ''}
+          float jag = fract(sin(floor(sx) * 12.9898 + 4.1) * 43758.5453);
+          float lo = 0.22 + 0.08 * jag, hi = lo + 0.1 + 0.07 * fract(jag * 7.13);
+          float ringB = smoothstep(lo, lo + 0.03, nvw.y) * (1.0 - smoothstep(hi, hi + 0.025, nvw.y)) * smoothstep(0.1, 0.13, vLocalP.y) * step(0.0, nvw.z);
+          totalEmissiveRadiance += (diffuseColor.rgb * 0.7 + vec3(0.04, 0.025, 0.025)) * ringB * (1.0 - 0.6 * line);` : ''}
           totalEmissiveRadiance += diffuseColor.rgb * uSelfLit;
         }`)
       .replace('#include <aomap_fragment>', `#include <aomap_fragment>
