@@ -202,6 +202,7 @@ export class NightBase {
   at(hour, fn) { this.events.push({ at: hour, fn, done: false }); }
 
   _end() {
+    UI.coach(null);
     if (this.jail) this.jail.stop();
     if (this.memes) this.memes.close();
     if (this.games) this.games.stop(true);
@@ -510,6 +511,7 @@ export class NightBase {
     const r = UI.chat.banOldestSpam();
     if (r === 'refused') { sfx.play('denied'); return; }
     if (r) {
+      if (!(Save.data.tips && Save.data.tips.ban)) { Save.set({ tips: { ...(Save.data.tips || {}), ban: true } }); UI.coach(null); UI.toast('แบนแล้ว! สแปมค้างนานเกิน 8 วิ คนดูจะหนี'); }
       sfx.play('ban');
       this.stats.bans++;
       this._addViewers(randInt(2, 5));
@@ -671,7 +673,11 @@ export class NightBase {
       const m = pick(spamChat);
       if (m) {
         this.chat(m.user, m.text, 'spam');
-        if (!this.spamHintShown) { this.spamHintShown = true; UI.toast('สแปมผีโผล่! กด Q เพื่อแบนก่อนคนดูหนี'); }
+        if (!this.spamHintShown) {
+          this.spamHintShown = true;
+          if (!(Save.data.tips && Save.data.tips.ban)) UI.coach('แชตผีโผล่! (ข้อความสีแดง)<br>กด <kbd>Q</kbd> แบนก่อนคนดูหนี');
+          else UI.toast('สแปมผีโผล่! กด Q เพื่อแบนก่อนคนดูหนี');
+        }
       }
     }
     this.scTimer -= dt;

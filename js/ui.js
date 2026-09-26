@@ -28,7 +28,7 @@ let E = {};
 const cbs = { start: [], retry: [], home: [], resume: [], next: [] };
 let chatMsgs = []; // { el, type, t0, banned }
 let viewers = { shown: 0, target: 0, from: 0, t0: 0 };
-let subTimer = 0;
+let subTimer = 0, subFinish = null;
 let subType = 0;
 let currentScreen = null;
 let menuPanel = null;       // open panel on the title screen
@@ -380,7 +380,8 @@ function build() {
   E.bars = el('div', 'fx-bars', root);
   el('div', 'fx-bar top', E.bars); el('div', 'fx-bar bottom', E.bars);
   E.skip = el('div', 'fx-skip', root);
-  el('kbd', null, E.skip, 'Enter'); el('span', null, E.skip, 'ข้าม');
+  el('kbd', null, E.skip, 'Space'); el('span', null, E.skip, 'ไปต่อ');
+  el('kbd', null, E.skip, 'Enter'); el('span', null, E.skip, 'ข้ามฉาก');
   buildKeyhole(root);
   E.black = el('div', 'fx-black', root);
   E.screens = { menu: buildMenu(), pause: buildPause(), intro: buildIntro(), dm: buildDM(), gameover: buildEnd('gameover'), win: buildEnd('win') };
@@ -772,7 +773,19 @@ export const UI = {
       if (i >= chars.length) clearInterval(subType);
     }, 22);
     subTimer = setTimeout(() => { E.subtitle.hidden = true; }, Math.max(800, ms));
+    subFinish = () => { clearInterval(subType); body.textContent = chars.join(''); };
   },
+  /** A tutorial bubble pointing at the chat (html allowed: <kbd>Q</kbd>), null hides it. */
+  coach(htmlText) {
+    if (!root) return;
+    if (!E.coach) { E.coach = el('div', 'coach', root); E.coach.hidden = true; }
+    E.coach.hidden = !htmlText;
+    if (htmlText) E.coach.innerHTML = htmlText;
+  },
+  /** Show the whole line at once (the player pressed while it was typing). */
+  subtitleFinish() { if (subFinish) subFinish(); },
+  /** The "▶ Space" nudge on a cutscene line that's waiting for the player. */
+  subtitleNext(on) { if (root) E.subtitle.classList.toggle('can-next', !!on); },
 
   chat: {
     /** type: 'normal' | 'spam' | 'superchat' | 'bot' (PeachiBot) | 'her' ("เธอ": looks like spam, can't be banned) */

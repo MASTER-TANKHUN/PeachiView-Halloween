@@ -63,6 +63,10 @@ export class Prologue {
     this.last = player.position.clone();
     this.step = 'walk';
     this.t = 0;
+    this.nudged = false;
+    // the bell works from the start: the flashlight is a tip, not a gate (players walked past the toast)
+    const ringable = () => this.step === 'walk' || this.step === 'light' || this.step === 'bell';
+    this.handles.push(player.addInteractable({ position: this.level.porch.bell, radius: 1.5, label: '[E] กดกริ่ง', onUse: () => this._ring(), enabled: ringable }));
     return new Promise((resolve) => { this.done = resolve; });
   }
 
@@ -84,16 +88,15 @@ export class Prologue {
 
     if (this.step === 'walk' && this.moved > 1.2) {
       this.step = 'light';
+      UI.setObjective('กดกริ่งหน้าบ้าน (มืดไป? กด F เปิดไฟฉาย)');
       UI.toast('มืดจัง… กด F เปิดไฟฉาย');
     }
     if (this.step === 'light' && player.flashlight.on) {
       this.step = 'bell';
       UI.setObjective('กดกริ่งหน้าบ้าน');
-      const bell = level.porch.bell;
-      this.handles.push(player.addInteractable({ position: bell, radius: 1.5, label: '[E] กดกริ่ง', onUse: () => this._ring(), enabled: () => this.step === 'bell' }));
       UI.toast('กด E เพื่อใช้ของ / เปิดประตู');
     }
-    if (this.step === 'bell' && this.t > 25 && !this.nudged) { this.nudged = true; UI.toast('กริ่งอยู่ข้างประตู ใต้ป้าย 249'); }
+    if ((this.step === 'light' || this.step === 'bell') && this.t > 20 && !this.nudged) { this.nudged = true; UI.toast('กริ่งอยู่ข้างประตู ใต้ป้าย 249 (เดินไปใกล้ๆ แล้วกด E)'); }
     if (this.step === 'enter' && p.x > -9.2) {
       this.step = 'hall';
       this.doors.slam('front');
@@ -109,7 +112,7 @@ export class Prologue {
   }
 
   async _ring() {
-    if (this.step !== 'bell') return;
+    if (this.step !== 'bell' && this.step !== 'light' && this.step !== 'walk') return;
     this.step = 'wait';
     sfx.play('doorbell');
     UI.setObjective(null);

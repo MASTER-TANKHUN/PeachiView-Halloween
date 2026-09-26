@@ -99,7 +99,8 @@ export function roomPorch(P, kit, M, root) {
   lights.push({ color: 0xffa860, intensity: 2.4, dist: 5.5, p: [X1 - 0.3, 2.0, -0.8], kind: 'flicker' });
   at(X1 - 0.005, 1.28, 0.74, -Math.PI / 2, () => { // doorbell
     add('plastic', S.rbox(0.07, 0.11, 0.02, 0.008), { p: [0, 0, 0.01], color: 0xe8e0d4 });
-    add('emit', S.cyl(0.016, 0.016, 0.012, 16), { p: [0, 0.01, 0.024], r: [Math.PI / 2, 0, 0], color: 0xffb4d0, emit: 2.5, ao: false });
+    add('emit', S.cyl(0.018, 0.018, 0.012, 16), { p: [0, 0.01, 0.024], r: [Math.PI / 2, 0, 0], color: 0xffb4d0, emit: 2.5, ao: false });
+    add('emit', S.torus(0.027, 0.004, 8, 24), { p: [0, 0.01, 0.022], color: 0xff8cbf, emit: 3, ao: false }); // lit ring: easy to spot in the dark
   });
   at(X1 - 0.005, 1.72, 0.74, -Math.PI / 2, () => pic(plaqueTexture(), 0.22, 0.14, { p: [0, 0, 0.012] }));
   at(X1 - 0.5, 0.004, 0, Math.PI / 2, () => pic(matTexture(), 0.95, 0.6, { r: [-Math.PI / 2, 0, 0], rough: 1 }));

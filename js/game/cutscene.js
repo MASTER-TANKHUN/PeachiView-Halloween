@@ -20,10 +20,30 @@ export class Cutscene {
     this.eye = new THREE.Vector3();
     this.look = new THREE.Vector3();
     this.shake = 0;
+    this.line = null; // the line on screen: { t, end, resolve } (say() waits for the player)
     window.addEventListener('keydown', (e) => {
-      if (!this.active || !this.skippable || this.skipping) return;
+      if (!this.active) return;
+      if (this.line && (e.code === 'Space' || e.code === 'KeyE')) { e.preventDefault(); this._advance(); return; }
+      if (!this.skippable || this.skipping) return;
       if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); this.skip(); }
     });
+    window.addEventListener('mousedown', (e) => { if (this.active && this.line && e.button === 0) this._advance(); });
+  }
+
+  /** Space / E / click: finish the line if it's still typing, else go on. */
+  _advance() {
+    const L = this.line;
+    if (!L) return;
+    if (L.t < L.end) { L.t = L.end; UI.subtitleFinish(); UI.subtitleNext(true); return; }
+    this._endLine();
+  }
+  _endLine() {
+    const L = this.line;
+    if (!L) return;
+    this.line = null;
+    UI.subtitleNext(false);
+    Talk.stop();
+    L.resolve();
   }
 
   /** Run an async scene: fn(cut) → Promise. Resolves when it ends. */
@@ -41,12 +61,14 @@ export class Cutscene {
     try { await fn(this); } finally {
       this.active = false; this.skipping = false;
       this.move = null; this.waits.forEach((w) => w.resolve()); this.waits = [];
+      this._endLine();
       UI.letterbox(false); UI.skipHint(false); UI.setHudMode('full');
     }
   }
 
   skip() {
     this.skipping = true;
+    this._endLine();
     Talk.stop();
     this.waits.forEach((w) => w.resolve()); this.waits = [];
     if (this.move) { this.move.t = this.move.dur; }
@@ -60,11 +82,15 @@ export class Cutscene {
   /** Fade to black (1) or back (0); instant while skipping. */
   fade(v, ms = 600) { return UI.fade(v, this.skipping ? 0 : ms); }
 
-  /** Line + wait for it (unless skipping). */
+  /**
+   * Line + wait for the player: Space / E / click goes on (the first press finishes a line still being
+   * typed). Left alone, it goes on by itself 5 s after the line is over.
+   */
   async say(who, text, opts = {}) {
     if (this.skipping) return;
-    const ms = Talk.say(who, text, opts);
-    await this.wait((opts.hold ?? ms) / 1000);
+    Talk.say(who, text, { ...opts, ms: 600000 }); // stays up until we move on
+    const end = Math.max(1.4, Array.from(String(text)).length * 0.055); // typing + the babble voice
+    await new Promise((resolve) => { this.line = { t: 0, end, resolve }; });
   }
 
   /** Put the camera at eye, looking at look (Vector3 or [x,y,z]). */
@@ -84,6 +110,13 @@ export class Cutscene {
 
   update(dt) {
     if (!this.active) return;
+    const L = this.line;
+    if (L) {
+      const was = L.t;
+      L.t += dt;
+      if (was < L.end && L.t >= L.end) UI.subtitleNext(true);
+      if (L.t >= L.end + 5) this._endLine();
+    }
     for (const w of this.waits.slice()) { w.left -= dt; if (w.left <= 0) { this.waits.splice(this.waits.indexOf(w), 1); w.resolve(); } }
     const m = this.move;
     if (m) {
