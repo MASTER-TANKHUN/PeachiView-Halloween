@@ -19,6 +19,7 @@ import { Anomalies } from '../systems/anomalies.js';
 import { Krasue } from '../ghosts/krasue.js';
 import { Memes } from '../systems/memes.js';
 import { MiniGames } from '../systems/minigames.js';
+import { Ending } from './ending.js';
 import { Night1 } from '../nights/night1.js';
 import { Night2 } from '../nights/night2.js';
 import { Night3 } from '../nights/night3.js';
@@ -48,6 +49,7 @@ export class Director {
     this.krasue = new Krasue(scene, level);
     this.memes = new Memes({ scene });
     this.games = new MiniGames({ scene, level, player, camera });
+    this.ending = new Ending();
     const ctx = {
       scene, camera, renderer, level, player, peachi, cut: this.cut, doors: this.doors, hide: this.hide, requests: this.requests,
       phone: this.phone, power: this.power, anomalies: this.anomalies, krasue: this.krasue, memes: this.memes, games: this.games, params,
@@ -189,6 +191,7 @@ export class Director {
     try { sfx.init(); } catch (e) { /* no gesture */ }
     this.setNight(this.pickNight());
     this.menu.exit();
+    if (this.params.get('ending') === '1') { await this.playEnding(); return; }
     if (this.params.get('prologue') === '1') {
       this.state = 'prologue';
       await this.prologue.run();
@@ -219,6 +222,18 @@ export class Director {
       this.prologue.update(dt);
       peachi.update(dt, t, { camera: this.camera });
     } else night.update(dt, t);
+  }
+
+  /** The normal ending (after the boss): dawn scene → Happy Halloween → credits → title. */
+  async playEnding(stats) {
+    const run = ++this.run;
+    this.state = 'ending';
+    this.night.abort();
+    UI.setHudMode('cine');
+    UI.showScreen('play');
+    await this.ending.play({ cut: this.cut, peachi: this.peachi, level: this.level, stats: stats || this.night.statRows() });
+    if (run !== this.run) return;
+    this.toMenu();
   }
 
   /** Right after the frame is rendered: the phone grabs a pending photo's thumbnail. */
