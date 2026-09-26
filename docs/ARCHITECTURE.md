@@ -7,7 +7,7 @@ Run a page headless: `node tools/smoke.mjs <page.html> <out.png> [waitMs] [click
 ## File ownership (edit ONLY your own files)
 | Owner | Files |
 |---|---|
-| A — Peachi model | `js/peachi/model.js`, `js/peachi/face.js`, `js/peachi/anim.js`, `peachi-viewer.html` |
+| A — Peachi model | `js/peachi/model.js`, `js/peachi/face.js`, `js/peachi/anim.js`, `js/peachi/peachi3d.js`, `peachi-viewer.html`, `peachi-3d.html`, `assets/models/*`, `tools/blender/**` |
 | B — World & player | `js/level.js`, `js/player.js` |
 | C — UI / audio / mic | `js/ui.js`, `js/mic.js`, `js/audio.js`, `js/data/chat.js`, `css/style.css` |
 | D — Game logic | `js/main.js`, `js/night.js`, `js/ghosts/peachi.js` |
@@ -40,6 +40,8 @@ export function buildPeachi({ ghost = true } = {}) // → PeachiModel
 export function buildHeadphonesItem() // → THREE.Group, the glowing cat-ear headphones pickup (~0.3 m), spins/bobs itself via userData.update(dt,t)
 ```
 Recognizable features (from `PLAN.md` §5): pink/white cat-ear headphones with peach logo, long wavy brown hair → pink tips, iridescent off-shoulder white/pink jacket, white crop top with peach "PEACHI", black pleated skirt with pink stripes, pink straps "PEACHI", heart choker, right leg white thigh-high "249 PEACH", chunky white/pink sneakers, big amber anime eyes. Face = CanvasTexture (`face.js`), 4 expressions. Ghost mode: legs fade out toward the floor, pink Fresnel rim glow, slightly translucent. Low-poly `flatShading`, ≤ ~5k tris.
+
+**Rigged 3D model (current look).** `buildPeachi({ ghost = true, use3d = true })` returns the procedural model at once and swaps in the rigged GLB `assets/models/peachi.glb` as soon as it has loaded (it stays procedural if loading fails; `use3d: false` = procedural only). Every call gets its own instance (the GLB is downloaded once). The wrapper implements the whole model API the game uses: `setExpression`, `setPose` (`idle` `float` `reach` `stunned` `jumpscare` → clips Idle / Float / Reach / Stunned / Jumpscare; idle + cry / angry → Cry / Angry), `setGlow`, `setGlowColor`, `setDark` / `dark`, `setDesat`, `setHeadphones` / `headphones`, `lookAt(v)`, `faceAnchor` (one stable Object3D on her face, it follows the head), `faceHeight` (1.435), plus `expression`, `pose`, `is3D`. `buildHeadphonesItem()` likewise swaps its procedural headphones for `assets/models/headphones.glb` (fitted to the same size). The GLB is 1.60 m, faces +Z, 124 bones (Mixamo names + hair / skirt / strap chains), 12 clips. The old builders stay as `buildPeachiProcedural()` / `buildHeadphonesItemProcedural()`. Runtime: `js/peachi/peachi3d.js` (`loadPeachi`, `loadHeadphones`); demo: `peachi-3d.html`; generator + rebuild: `tools/blender/README.md`; notes: `docs/PEACHI_3D.md`. Never hand-edit the GLBs: change `tools/blender/` and rebuild.
 
 ### B: `js/level.js`
 ```js

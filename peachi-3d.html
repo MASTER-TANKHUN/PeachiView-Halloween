@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Peachi 3D Rig</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600&display=swap" rel="stylesheet">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    :root { --pink: #ff7eb6; --ink: #ffe3f0; --panel: rgba(28, 14, 40, 0.78); }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #140a22; color: var(--ink); font-family: Kanit, system-ui, sans-serif; }
+    canvas { display: block; }
+    #ui { position: fixed; left: 12px; top: 12px; width: 300px; max-height: calc(100% - 24px); overflow: auto; background: var(--panel);
+          border: 1px solid rgba(255, 126, 182, 0.35); border-radius: 14px; padding: 10px 12px; backdrop-filter: blur(6px); z-index: 2; }
+    #ui h1 { font-size: 16px; margin: 0 0 6px; color: #fff; }
+    #ui h2 { font-size: 12px; margin: 10px 0 4px; opacity: 0.75; font-weight: 600; letter-spacing: 0.04em; }
+    .row { display: flex; flex-wrap: wrap; gap: 5px; }
+    button { font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 999px; border: 1px solid rgba(255, 126, 182, 0.55);
+             background: rgba(255, 126, 182, 0.08); color: var(--ink); cursor: pointer; }
+    button:hover { background: rgba(255, 126, 182, 0.25); }
+    button.on { background: var(--pink); color: #2a0c1c; border-color: var(--pink); }
+    select, input[type=range] { width: 100%; }
+    select { font: inherit; font-size: 12px; background: #24122f; color: var(--ink); border: 1px solid rgba(255, 126, 182, 0.4); border-radius: 8px; padding: 3px; }
+    #hint { font-size: 11px; opacity: 0.65; margin-top: 8px; line-height: 1.4; }
+    #load { position: fixed; inset: 0; display: grid; place-items: center; font-size: 18px; color: #ffc2dc; }
+    @media (max-width: 640px) { #ui { width: auto; right: 12px; max-height: 40%; } }
+  </style>
+</head>
+<body>
+  <div id="load">กำลังโหลดพีชชี่… 🍑</div>
+  <div id="ui" hidden>
+    <h1>🍑 Peachi 3D — rigged</h1>
+    <h2>ANIMATION</h2><div class="row" id="clips"></div>
+    <h2>EXPRESSION</h2><div class="row" id="emos"></div>
+    <h2>DISPLAY</h2>
+    <div class="row">
+      <button id="bOutline" class="on">outline</button><button id="bToon" class="on">toon</button>
+      <button id="bGhost">ghost</button><button id="bBones">skeleton</button>
+      <button id="bLook" class="on">look at me</button><button id="bTalk">talk</button><button id="bSpin">spin</button>
+    </div>
+    <h2>POSE MODE (ขยับกระดูกเอง)</h2>
+    <div class="row"><button id="bPose">pose mode</button><button id="bReset">reset pose</button></div>
+    <select id="boneSel" hidden></select>
+    <div id="hint">ลากเมาส์หมุนกล้อง · pose mode: เลือกกระดูกแล้วลากวงแหวนเพื่อหมุน</div>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
+    import { loadPeachi, EMOTIONS } from './js/peachi/peachi3d.js';
+
+    const q = new URLSearchParams(location.search);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: q.has('shot') });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+    const outline = new OutlineEffect(renderer, { defaultThickness: 0.0032, defaultColor: [0.16, 0.07, 0.12] });
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a0d2a);
+    scene.fog = new THREE.Fog(0x1a0d2a, 6, 14);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.55;
+
+    const hemi = new THREE.HemisphereLight(0xffe6f0, 0x6a4a86, 1.1); scene.add(hemi);
+    const key = new THREE.DirectionalLight(0xfff1e8, 2.0); key.position.set(1.4, 3.2, 2.6);
+    key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004;
+    Object.assign(key.shadow.camera, { left: -1.2, right: 1.2, top: 2.2, bottom: -0.2, near: 0.5, far: 8 }); scene.add(key);
+    const rim = new THREE.DirectionalLight(0xff8fc8, 1.6); rim.position.set(-2, 2.2, -2.5); scene.add(rim);
+    const fill = new THREE.DirectionalLight(0xb9a8ff, 0.5); fill.position.set(-2.5, 1.2, 1.5); scene.add(fill);
+
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(2.2, 64), new THREE.MeshStandardMaterial({ color: 0x2a1840, roughness: 0.95 }));
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+    const glow = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.62, 64), new THREE.MeshBasicMaterial({ color: 0xff7eb6, transparent: true, opacity: 0.35 }));
+    glow.rotation.x = -Math.PI / 2; glow.position.y = 0.002; scene.add(glow);
+
+    const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 50);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    const CAMS = {
+      full: [[0.9, 1.1, 3.9], [0, 0.85, 0]], front: [[0, 0.9, 4.2], [0, 0.85, 0]], three: [[1.9, 1.2, 3.4], [0, 0.85, 0]],
+      side: [[4.0, 1.0, 0], [0, 0.85, 0]], back: [[0, 1.1, -4.1], [0, 0.85, 0]], face: [[0.25, 1.48, 0.95], [0, 1.44, 0]],
+      bust: [[0.5, 1.35, 1.7], [0, 1.25, 0]],
+      skirt: [[0.35, 0.95, 1.5], [0, 0.88, 0]], legs: [[0.4, 0.5, 1.8], [0, 0.45, 0]], feet: [[0.5, 0.3, 1.1], [0, 0.12, 0]],
+      head3: [[0.75, 1.52, 0.95], [0, 1.46, 0]], top: [[0.0, 2.05, 0.35], [0, 1.52, 0]], headside: [[1.05, 1.47, 0.0], [0, 1.46, 0]], headback: [[-0.3, 1.5, -1.0], [0, 1.44, 0]],
+    };
+    function setCam(n) { const c = CAMS[n] || CAMS.full; camera.position.set(...c[0]); controls.target.set(...c[1]); controls.update(); }
+    setCam(q.get('cam') || 'full');
+
+    const peachi = await loadPeachi('assets/models/peachi.glb');
+    scene.add(peachi.object);
+    peachi.object.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+    if (q.get('hide')) {   // debug: hide objects by name prefix
+      const pre = q.get('hide').split(',');
+      peachi.object.traverse((o) => { if (o.isMesh && pre.some((p) => o.name.startsWith(p))) o.visible = false; });
+    }
+    if (q.get('only')) {
+      const pre = q.get('only').split(',');
+      peachi.object.traverse((o) => { if (o.isMesh) o.visible = pre.some((p) => o.name.startsWith(p)); });
+    }
+    document.getElementById('load').remove();
+
+    // ---- UI
+    const $ = (id) => document.getElementById(id);
+    const ui = $('ui');
+    if (q.get('ui') !== '0') ui.hidden = false;
+    let clipName = q.get('clip') || 'Idle';
+    let emo = q.get('emo') || 'happy';
+    let useOutline = q.get('outline') !== '0', spin = q.get('spin') === '1', paused = q.has('t');
+    function mkButtons(el, names, cb, cur) {
+      el.innerHTML = '';
+      for (const n of names) {
+        const b = document.createElement('button'); b.textContent = n; b.dataset.n = n;
+        b.onclick = () => { cb(n); for (const x of el.children) x.classList.toggle('on', x.dataset.n === n); };
+        if (n === cur) b.classList.add('on');
+        el.appendChild(b);
+      }
+    }
+    mkButtons($('clips'), peachi.clips.filter((c) => c !== 'TPose').concat(['TPose']), (n) => { clipName = n; peachi.play(n); }, clipName);
+    mkButtons($('emos'), Object.keys(EMOTIONS), (n) => { emo = n; peachi.setEmotion(n); }, emo);
+    const tog = (id, init, fn) => { const b = $(id); b.classList.toggle('on', init); b.onclick = () => { const v = !b.classList.contains('on'); b.classList.toggle('on', v); fn(v); }; };
+    tog('bOutline', useOutline, (v) => { useOutline = v; });
+    tog('bToon', true, (v) => location.search.includes('toon=0') ? null : peachi.setRim(v ? 0.35 : 0.0));
+    tog('bGhost', q.get('ghost') === '1', (v) => { ghostTarget = v ? 1 : 0; });
+    const skel = new THREE.SkeletonHelper(peachi.object); skel.visible = false; scene.add(skel);
+    tog('bBones', false, (v) => { skel.visible = v; });
+    tog('bLook', true, (v) => peachi.setLookAt(v));
+    tog('bTalk', false, (v) => peachi.setTalking(v));
+    tog('bSpin', spin, (v) => { spin = v; });
+
+    // ---- pose mode: TransformControls on a chosen bone
+    const tc = new TransformControls(camera, renderer.domElement);
+    tc.setMode('rotate'); tc.setSpace('local'); tc.size = 0.7;
+    const tcHelper = tc.getHelper ? tc.getHelper() : tc;
+    scene.add(tcHelper);
+    tc.addEventListener('dragging-changed', (e) => { controls.enabled = !e.value; });
+    const sel = $('boneSel');
+    const boneNames = Object.keys(peachi.bones).filter((n) => !/_0[2-9]$/.test(n));
+    for (const n of boneNames) { const o = document.createElement('option'); o.value = o.textContent = n; sel.appendChild(o); }
+    sel.value = 'RightArm';
+    let poseMode = false;
+    const rest = {};
+    tog('bPose', false, (v) => {
+      poseMode = v; sel.hidden = !v;
+      if (v) { peachi.mixer.stopAllAction(); peachi.setLookAt(false); for (const [n, b] of Object.entries(peachi.bones)) rest[n] = rest[n] || b.quaternion.clone(); tc.attach(peachi.bones[sel.value]); skel.visible = true; $('bBones').classList.add('on'); }
+      else { tc.detach(); peachi.play(clipName, 0); peachi.setLookAt($('bLook').classList.contains('on')); }
+    });
+    sel.onchange = () => { if (poseMode) tc.attach(peachi.bones[sel.value]); };
+    $('bReset').onclick = () => { for (const [n, qq] of Object.entries(rest)) peachi.bones[n].quaternion.copy(qq); };
+
+    peachi.setEmotion(emo);
+    peachi.play(clipName, 0);
+    let ghost = q.get('ghost') === '1' ? 1 : 0, ghostTarget = ghost;
+    if (q.get('talk') === '1') peachi.setTalking(true);
+
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+    const clock = new THREE.Clock();
+    if (paused) {   // deterministic frame for screenshots: ?clip=Wave&t=0.8
+      peachi.update(Number(q.get('t')), camera);
+    }
+    renderer.setAnimationLoop(() => {
+      const dt = Math.min(clock.getDelta(), 0.05);
+      if (!paused && !poseMode) peachi.update(dt, camera);
+      else if (poseMode) peachi.object.updateMatrixWorld(true);
+      ghost += (ghostTarget - ghost) * Math.min(1, dt * 4);
+      peachi.setGhost(ghost);
+      if (spin) peachi.object.rotation.y += dt * 0.5;
+      controls.update();
+      if (useOutline) outline.render(scene, camera); else renderer.render(scene, camera);
+    });
+    window.__ready = true;
+  </script>
+</body>
+</html>

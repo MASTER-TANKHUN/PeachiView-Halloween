@@ -8,3 +8,7 @@ level-test.html
 ui-test.html
 peachi-viewer.html
 Character_Sheet_1_Peachi.png
+
+# Peachi 3D sources (the site only needs assets/models/*.glb)
+*.blend
+peachi-3d.html
