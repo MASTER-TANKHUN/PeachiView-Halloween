@@ -1,0 +1,10 @@
+# dev-only files: keep the deployed site to the game itself
+tools/
+docs/
+__pycache__/
+*.py
+PLAN.md
+level-test.html
+ui-test.html
+peachi-viewer.html
+Character_Sheet_1_Peachi.png

@@ -12,7 +12,7 @@ catch { playwright = require(join(process.execPath, '../../lib/node_modules/play
 
 const [page = 'index.html', out = '/tmp/shot.png', waitMs = '3000', clickSel] = process.argv.slice(2);
 const root = resolve(new URL('..', import.meta.url).pathname);
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.json': 'application/json' };
 
 const server = createServer(async (req, res) => {
   try {
@@ -28,6 +28,13 @@ const browser = await playwright.chromium.launch({
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
 });
 const tab = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+// Offline CDN: if three is installed locally (npm i --no-save three@0.170.0), serve jsdelivr requests from node_modules.
+const localThree = join(root, 'node_modules/three');
+await tab.route(/cdn\.jsdelivr\.net\/npm\/three@[^/]+\//, async (route) => {
+  const rel = new URL(route.request().url()).pathname.replace(/^\/npm\/three@[^/]+\//, '');
+  try { await route.fulfill({ body: await readFile(join(localThree, rel)), contentType: 'text/javascript' }); }
+  catch { await route.continue(); }
+});
 const errors = [];
 tab.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 tab.on('pageerror', (e) => errors.push(String(e)));

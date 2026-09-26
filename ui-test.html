@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>UI test</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&family=Mitr:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/style.css">
   <style>
     #app { background: radial-gradient(ellipse at 40% 60%, #3a1b52, #120720 60%, #05020a); }
@@ -70,9 +70,9 @@
     UI.setViewers(1200);
     UI.setBattery(64);
     UI.setMood('angry');
-    UI.setObjective('หาหูฟังหูแมวของพีชชี่ 🎧');
+    UI.setObjective('หาหูฟังหูแมวของพีชชี่');
     UI.setPrompt('[E] หยิบหูฟังหูแมว');
-    UI.toast('📢 มอดใหม่เข้าห้องแล้ว!');
+    UI.toast('มอดใหม่เข้าห้องแล้ว');
     UI.subtitle(pick(peachiLines.angry), 5000);
     UI.vignette(0.35);
     UI.flash('#ff7eb6');

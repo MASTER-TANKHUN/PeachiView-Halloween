@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Level test</title>
-  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&family=Mitr:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/fonts.css">
   <script type="importmap">
   {
     "imports": {
@@ -22,13 +22,17 @@
 import * as THREE from 'three';
 import { buildLevel } from './js/level.js';
 import { Player } from './js/player.js';
+import { createPost } from './js/world/post.js';
 
 const q = new URLSearchParams(location.search);
 const info = document.getElementById('info');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const usePost = q.get('post') !== '0' && q.get('view') !== 'top';
+renderer.toneMapping = usePost ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 120);
@@ -102,10 +106,12 @@ if (q.has('x')) player.position.set(+q.get('x'), 0, +q.get('z'));
 if (q.has('yaw')) player.yaw = +q.get('yaw');
 if (q.has('pitch')) player.pitch = +q.get('pitch');
 if (q.get('flicker') === '1') level.setFlicker(true);
+if (q.get('fl') === '0') player.flashlight.on = false;
+const post = usePost ? createPost(renderer, scene, camera) : null;
 const top = q.get('view') === 'top';
 let topCam;
 if (top) {
-  level.root.getObjectByName('ceiling').visible = false;
+  level.root.traverse((o) => { if (o.name === 'ceiling') o.visible = false; });
   scene.fog = null;
   scene.add(new THREE.AmbientLight(0xffffff, 2.5));
   topCam = new THREE.OrthographicCamera(-11 * innerWidth / innerHeight, 11 * innerWidth / innerHeight, 11, -11, 0.1, 100);
@@ -122,7 +128,7 @@ function loop() {
   const dt = Math.min(clock.getDelta(), 0.05); t += dt; frames++;
   level.update(dt, t);
   player.update(dt);
-  renderer.render(scene, top ? topCam : camera);
+  if (post) post.render(dt); else renderer.render(scene, top ? topCam : camera);
   info.textContent = `frames ${frames}  calls ${renderer.info.render.calls}  tris ${renderer.info.render.triangles}  battery ${player.flashlight.battery.toFixed(1)}  pos ${player.position.x.toFixed(2)},${player.position.z.toFixed(2)}  room ${level.roomAt(player.position)}`;
   requestAnimationFrame(loop);
 }

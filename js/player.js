@@ -28,6 +28,8 @@ export class Player {
     this.moving = false;
     this.running = false;
     this.sensitivity = 0.0022;
+    this.speedMul = 1;         // < 1 while carrying something awkward
+    this.blockArrows = false;  // arrow keys drive the phone instead
 
     this.onPrompt = () => {};
     this.onFlashlightToggle = () => {};
@@ -48,6 +50,13 @@ export class Player {
     // flashlight: warm spot hanging off the camera, aimed forward
     const spot = new THREE.SpotLight(0xffe2b8, 0, 14, 0.45, 0.45, 1.5);
     spot.position.set(0.12, -0.12, 0);
+    // the beam casts shadows (furniture shadows swinging with the flashlight); ghosts don't cast any
+    spot.castShadow = true;
+    spot.shadow.mapSize.set(1024, 1024);
+    spot.shadow.camera.near = 0.15;
+    spot.shadow.camera.far = 14;
+    spot.shadow.bias = -0.0006;
+    spot.shadow.normalBias = 0.02;
     spot.target.position.set(0, 0, -8);
     camera.add(spot);
     camera.add(spot.target);
@@ -72,6 +81,7 @@ export class Player {
     };
     this._onKeyDown = (e) => {
       if (!this._enabled) return;
+      if (this.blockArrows && e.code.startsWith('Arrow')) return; // the phone uses them
       const k = MOVE_KEYS[e.code];
       if (k) this._input[k] = true;
       if (e.repeat) return;
@@ -179,7 +189,7 @@ export class Player {
     let mx = -sy * f + cy * s, mz = -cy * f - sy * s;
     const len = Math.hypot(mx, mz);
     this.running = len > 0 && inp.run;
-    const speed = this.running ? RUN : WALK;
+    const speed = (this.running ? RUN : WALK) * this.speedMul;
     if (len > 0) { mx = (mx / len) * speed; mz = (mz / len) * speed; }
     const a = 1 - Math.exp(-14 * dt);
     this.velocity.x += (mx - this.velocity.x) * a;
