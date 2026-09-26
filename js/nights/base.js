@@ -43,6 +43,8 @@ export class NightBase {
   get hour() { return this.time / this.secondsPerHour; }
   get speed() { return Number(this.params?.get('speed')) || 1; }
   get god() { return this.params?.get('god') === '1'; }
+  /** Space is taken by something else right now (the breaker QTE): no screaming. */
+  get inputLock() { return !!(this.power && this.power.busy); }
 
   _resetVars() {
     this.time = 0;
@@ -67,7 +69,8 @@ export class NightBase {
     this.sleepyChatDone = false;
     this.caughtReason = 'caught';
     this.boredT = 0;
-    this.stats = { screams: 0, bans: 0, requests: 0, maxViewers: START_VIEWERS, hides: 0, closeCalls: 0 };
+    this.stats = { screams: 0, bans: 0, requests: 0, maxViewers: START_VIEWERS, hides: 0, closeCalls: 0, photos: 0, bestPhoto: 0 };
+    this.missions = []; // super-chat missions: { id, text, sub, left, reward, photo: subject kind, done }
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -96,9 +99,14 @@ export class NightBase {
     this.doors.attach();
     this.hide.attach();
     this.requests.attach();
+    if (this.phone) { this.phone.reset(); this.phone.provider = this; }
+    if (this.power) this.power.reset();
+    if (this.memes) this.memes.attach(this);
     this.requests.onResult = (kind, ok, why) => this._onRequest(kind, ok, why);
     this.hide.onEnter = () => { this.hideT = 0; this.searchedThisHide = false; this.sleepyChatDone = false; this.stats.hides++; this.hideSeenDist = peachi.distToPlayer; };
     this.hide.onExit = () => { if (peachi.state === 'search') { peachi.search = null; peachi.state = 'roam'; } };
+    this.resignArmed = 0;
+    this.doors.onFront = () => this._frontDoor();
 
     UI.setHudMode('full');
     UI.setNight(this.label);
@@ -146,6 +154,9 @@ export class NightBase {
   at(hour, fn) { this.events.push({ at: hour, fn, done: false }); }
 
   _end() {
+    if (this.memes) this.memes.close();
+    if (this.power) this.power.close(true);
+    if (this.phone) { this.phone.close(); this.phone.lower(); }
     this.hide.reset();
     this.requests.cancel();
     this.player.enabled = false;
@@ -164,7 +175,7 @@ export class NightBase {
     Save.addStats({ deaths: 1 });
     if (reason !== 'caught' && reason !== 'found') sfx.play('lose');
     if (reason === 'timeout') { this.peachi._setExpression('scream'); UI.flash('#ff2a6d'); UI.shake(600); }
-    const L = LOSE[reason] || LOSE.caught;
+    const L = this.loseCard(reason);
     UI.showScreen('gameover', { ...L, stats: this.statRows() });
     this.onEnd('gameover', reason);
   }
@@ -180,8 +191,17 @@ export class NightBase {
     try { await this.winScene(); } catch (e) { console.error('[win scene]', e); }
     if (this.state !== 'cutscene') return; // aborted meanwhile
     this.state = 'won';
-    UI.showScreen('win', { ...this.winCard(), stats: this.statRows() });
+    UI.showScreen('win', { ...this.winCard(), stats: this.statRows(), next: this.nextLabel || null });
     this.onEnd('win');
+  }
+
+  loseCard(reason) { return LOSE[reason] || LOSE.caught; }
+
+  /** The front door: press twice to quit the job (a joke ending). */
+  _frontDoor() {
+    if (this.resignArmed > 0) { this.bot(BOT.resign); this.lose('resign'); return; }
+    this.resignArmed = 3;
+    UI.toast('จะลาออกจริงเหรอ? กด E อีกครั้งเพื่อออกจากบ้าน');
   }
 
   statRows() {
@@ -200,6 +220,69 @@ export class NightBase {
   onUpdate() {}
   async winScene() {}
   winCard() { return { title: 'รอดแล้ว', text: '' }; }
+
+  // ---------------------------------------------------------------- the phone (Tab): what this night shows on it
+  /** Goal line(s) at the top of the missions tab. */
+  goalRows() { return []; }
+  missionRows() {
+    const rows = [...this.goalRows()];
+    const r = this.requests.active;
+    if (r) rows.push({ text: `พีชชี่ขอ: ${this.requests.noteOf(r.kind)}`, left: Math.ceil(r.left), urgent: r.left < 10 });
+    for (const m of this.missions) rows.push({ text: m.text, sub: m.done ? 'สำเร็จแล้ว' : m.sub, left: m.done ? null : Math.ceil(m.left), done: m.done, kind: 'sc' });
+    return rows;
+  }
+  // (the phone calls these through `provider`)
+  actions() { return []; }
+  get reportEnabled() { return false; }
+  mapInfo() { return { hint: '', icons: [] }; }
+  subjects() {
+    const p = this.peachi;
+    if (!p.group.visible || !p.active) return [];
+    const pos = new THREE.Vector3(p.position.x, 1.2, p.position.z);
+    return [{
+      kind: 'peachi', id: 'peachi', pos, base: 45,
+      facing: () => { const c = this.camera.position; const want = Math.atan2(c.x - p.position.x, c.z - p.position.z); let d = want - p.group.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d) < 0.6; },
+      special: () => p.isStunned,
+      caption: (h) => (p.isStunned ? 'พีชชี่ตาลาย (หลังโดนกรี๊ดใส่)' : p.isAngry ? 'พีชชี่โกรธใส่กล้อง!!' : h.facing ? 'พีชชี่ยิ้มให้กล้อง (แบบผีๆ)' : 'พีชชี่หลุดเฟรมนิดนึง'),
+    }];
+  }
+  onPhoto(photo) {
+    this.stats.photos++;
+    this.stats.bestPhoto = Math.max(this.stats.bestPhoto, photo.score);
+    if (photo.score > 0) {
+      this._addViewers(Math.min(40, Math.round(photo.score / 5)));
+      if (photo.score >= 40) this.chat(pick(HYPE_USERS), pick(['รูปนี้ต้องเป็นปกคลิป!', 'แคปจอไว้แล้ว!!', 'ขอรูปนี้ทำโปรไฟล์']));
+    }
+    for (const m of this.missions) {
+      if (m.done || !m.photo) continue;
+      const hit = photo.hits.find((h) => h.kind === m.photo && h.score >= (m.min || 15));
+      if (hit) {
+        m.done = true;
+        this._addViewers(m.reward || 25);
+        sfx.play('superchat');
+        UI.chat.push({ user: m.user || 'ลูกพีชน้อย_249', text: m.thanks || 'ขอบคุณค่ะมอด! รูปสวยมาก', type: 'superchat', amount: m.amount || 100 });
+        UI.toast(`ภารกิจสำเร็จ! +${m.reward || 25} ผู้ชม`);
+      }
+    }
+    this.onPhotoTaken(photo);
+  }
+  onPhotoTaken() {}
+  /** A super-chat asks for something (a photo of … within `sec`). */
+  addMission(m) {
+    const mm = { left: 90, reward: 25, done: false, ...m };
+    this.missions.push(mm);
+    sfx.play('superchat');
+    UI.chat.push({ user: mm.user || 'ลูกพีชน้อย_249', text: mm.ask || mm.text, type: 'superchat', amount: mm.amount || 100 });
+    return mm;
+  }
+  _updateMissions(dt) {
+    for (const m of this.missions) {
+      if (m.done || m.failed) continue;
+      m.left -= dt;
+      if (m.left <= 0) { m.failed = true; m.done = false; this.chat(m.user || 'ลูกพีชน้อย_249', 'ไม่เป็นไรค่ะ… ไว้คราวหน้า'); }
+    }
+    this.missions = this.missions.filter((m) => !m.failed && !(m.done && (m.shownDone = (m.shownDone || 0) + dt) > 8));
+  }
 
   // ---------------------------------------------------------------- input / events
   banSpam() {
@@ -279,6 +362,7 @@ export class NightBase {
     this._updateHiding(dt);
     if (this.state !== 'play' || peachi.state === 'jumpscare') return;
     this.requests.update(dt);
+    this._updateMissions(dt);
     this._updateChat(dt);
     this._updateSpamPenalty();
 
@@ -300,6 +384,7 @@ export class NightBase {
     this.boredT = angry || d < 6 || this.requests.active ? 0 : this.boredT + dt;
     if (this.boredT > 60) { this._addViewers(-dt); if (Math.random() < dt * 0.1) this.chat(pick(HYPE_USERS), 'ง่วงแล้วว มีอะไรเกิดขึ้นบ้างมั้ย'); }
 
+    if (this.resignArmed > 0) this.resignArmed -= dt;
     this.onUpdate(dt, t);
     if (this.state !== 'play') return;
     this._updateHud();

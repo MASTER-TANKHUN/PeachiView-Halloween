@@ -12,6 +12,7 @@ function fresh() {
     achievements: {},       // id → timestamp
     stats: { screams: 0, bans: 0, requests: 0, deaths: 0, nightsPlayed: 0 },
     endings: {},            // id → timestamp
+    memes: {},              // secret Peachi pictures found around the house: id → timestamp
   };
 }
 
@@ -54,6 +55,13 @@ export const Save = {
   unlock(id) {
     if (this.data.achievements[id]) return false;
     this.data.achievements[id] = Date.now();
+    write();
+    return true;
+  },
+  /** Mark a secret picture found. Returns true the first time. */
+  findMeme(id) {
+    if (this.data.memes[id]) return false;
+    this.data.memes[id] = Date.now();
     write();
     return true;
   },

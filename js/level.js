@@ -141,12 +141,20 @@ export function buildLevel(scene) {
   for (const L of lights) L.room = roomAt(L.light.position);
   const roomOn = {};
   for (const k in PLAN.rooms) roomOn[k] = true;
+  let power = true; // false = blackout: every switched light and the TV go dark (candles and the stream PC stay)
   const offMat = new THREE.MeshLambertMaterial({ vertexColors: true, color: 0x2a2628 });
   const switchedMeshes = [...(meshes.emitFairy || []), ...(meshes.emitRGB || [])];
+  const tvScreens = [];
+  root.traverse((o) => { if (o.isMesh && o.material && o.material.isMeshBasicMaterial && o.material.map && o.material.map === rooms.screens.tv) tvScreens.push(o); });
+  const tvOff = new THREE.MeshBasicMaterial({ color: 0x050506 });
+  function syncMeshes() {
+    for (const m of switchedMeshes) { const on = power && roomOn[m.userData.region] !== false; m.material = on ? M[m.name] : offMat; }
+    for (const m of tvScreens) { m.userData.onMat ||= m.material; m.material = power ? m.userData.onMat : tvOff; }
+  }
   function setRoomLights(room, on) {
     if (!(room in roomOn) || roomOn[room] === !!on) return false;
     roomOn[room] = !!on;
-    for (const m of switchedMeshes) if (m.userData.region === room) m.material = on ? M[m.name] : offMat;
+    syncMeshes();
     return true;
   }
   // wall switches, inside each room by its door (latch side)
@@ -188,7 +196,7 @@ export function buildLevel(scene) {
       else if (L.kind === 'tv') m = 0.7 + 0.3 * Math.sin(t * 7.3 + L.seed) * Math.sin(t * 2.1);
       else if (L.kind === 'bulb') m = 0.94 + 0.06 * Math.sin(t * 31 + L.seed) * Math.sin(t * 3.3);
       else if (L.kind === 'flicker') { const k = Math.sin(t * 2.3 + L.seed) + Math.sin(t * 5.1 + L.seed * 2); m = k > 1.55 ? 0.15 + 0.3 * Math.random() : 0.9 + 0.1 * Math.sin(t * 40); }
-      const off = SWITCHED.has(L.kind) && L.room && !roomOn[L.room];
+      const off = (SWITCHED.has(L.kind) && ((L.room && !roomOn[L.room]) || !power)) || (L.kind === 'tv' && !power);
       L.light.intensity = off ? 0 : L.base * m * (L.kind === 'screen' || L.kind === 'moon' ? Math.max(flickM, 0.3) : flickM);
     }
     emitF.color.setScalar(flicker ? Math.max(flickM, 0.1) : 1);
@@ -216,10 +224,20 @@ export function buildLevel(scene) {
     switches: SWITCHES,
     setRoomLights(room, on) { const r = setRoomLights(room, on); syncSwitches(); return r; },
     roomLightsOn(room) { return roomOn[room] !== false; },
+    /** The room's point lights: [{ light, base, kind }] (anomalies recolor them). */
+    lightsIn(room) { return lights.filter((L) => L.room === room); },
+    /** The room is actually lit: its switch is on and the house has power. */
+    roomLit(room) { return power && roomOn[room] !== false; },
+    get power() { return power; },
+    /** Blackout (false) / power back (true). */
+    setPower(on) { if (power === !!on) return false; power = !!on; syncMeshes(); return true; },
     resetWorld() {
       for (const d of doors) this.setDoor(d.id, !d.o.closed, { instant: true });
-      for (const k in roomOn) setRoomLights(k, true);
+      power = true;
+      for (const k in roomOn) roomOn[k] = true;
+      syncMeshes();
       syncSwitches();
+      flicker = false; flickM = 1;
     },
   };
 }

@@ -25,7 +25,7 @@ const PEACH = '<svg class="peach-mark" viewBox="0 0 64 64" aria-hidden="true"><p
 
 let root = null;
 let E = {};
-const cbs = { start: [], retry: [], home: [], resume: [] };
+const cbs = { start: [], retry: [], home: [], resume: [], next: [] };
 let chatMsgs = []; // { el, type, t0, banned }
 let viewers = { shown: 0, target: 0, from: 0, t0: 0 };
 let subTimer = 0;
@@ -128,7 +128,7 @@ function buildHowto(parent) {
   el('p', 'ptext', parent, 'คืนก่อนฮาโลวีน พีชชี่เปิดไลฟ์มาราธอนแล้วเผลอหลับ บอทมอดของเธอไม่ยอมให้ไลฟ์จบ จนเธอกลายเป็นผีติดอยู่ในไลฟ์ของตัวเอง คุณคือมอดมือใหม่ที่ถูกเรียกมาตอนเที่ยงคืน');
   el('p', 'ptext', parent, 'หาหูฟังหูแมวที่หายไปในบ้าน แล้วเอาไปวางคืนที่โต๊ะสตรีมก่อนหกโมงเช้า พีชชี่จะขอโน่นขอนี่เป็นระยะ ทำให้ทันเธอจะอารมณ์ดี ถ้าปล่อยให้เหงานานๆ เธอจะโกรธและไล่ตามคุณ');
   const grid = el('div', 'keys', parent);
-  for (const [k, v] of [['W A S D', 'เดิน'], ['Shift', 'วิ่ง'], ['เมาส์', 'มองรอบๆ'], ['E', 'หยิบ / ประตู / สวิตช์ / ซ่อน'], ['F', 'ไฟฉาย (แบตหมดได้)'], ['Space รัวๆ', 'กรี๊ดไล่ผี'], ['Space ค้าง', 'กลั้นหายใจตอนซ่อน'], ['Q', 'แบนแชตผี'], ['Esc', 'พักเกม']]) {
+  for (const [k, v] of [['W A S D', 'เดิน'], ['Shift', 'วิ่ง'], ['เมาส์', 'มองรอบๆ'], ['E', 'หยิบ / ประตู / สวิตช์ / ซ่อน'], ['F', 'ไฟฉาย (แบตหมดได้)'], ['Space รัวๆ', 'กรี๊ดไล่ผี'], ['Space ค้าง', 'กลั้นหายใจตอนซ่อน'], ['Q', 'แบนแชตผี'], ['Tab', 'มือถือ: ภารกิจ / รายงาน / แผนที่'], ['C / คลิกขวา', 'ยกกล้องถ่ายรูป'], ['R ค้าง', 'ซ่อนลูกพีชทองในเสื้อ'], ['Esc', 'พักเกม']]) {
     const r = el('div', 'krow', grid); el('kbd', null, r, k); el('span', null, r, v);
   }
   el('p', 'pnote', parent, 'ถ้าอนุญาตไมค์ ตะโกนใส่ไมค์ได้เลย ระยะไม่เกิน 7 เมตร พีชชี่จะชะงักและถอยไป แต่ตอนซ่อนต้องเงียบนะ ส่องไฟฉายใส่ตอนเธอโกรธจะช่วยให้เธอช้าลง แนะนำให้ใส่หูฟัง');
@@ -250,7 +250,11 @@ function buildKeyhole(parent) {
     <ellipse class="kh-eye" cx="200" cy="175" rx="150" ry="95" fill="url(#kh-white)"/>
     <path d="M60 170 C 110 150 130 190 170 176 M250 190 C 290 200 300 160 350 180 M120 230 C 150 215 170 240 190 226" stroke="#b02a2a" stroke-width="2" fill="none" opacity=".7"/>
     <circle class="kh-iris" cx="200" cy="172" r="58" fill="url(#kh-iris)"/><circle class="kh-iris" cx="200" cy="172" r="24" fill="#050202"/>
-    <circle cx="182" cy="152" r="9" fill="#fff" opacity=".85"/></g></svg>`);
+    <circle cx="182" cy="152" r="9" fill="#fff" opacity=".85"/>
+    <g class="kh-man"><rect width="400" height="400" fill="#0a0406"/><ellipse cx="200" cy="80" rx="150" ry="70" fill="#ff8cbf"/>
+    <ellipse cx="200" cy="200" rx="110" ry="140" fill="#e8dccc"/><path d="M60 110 C 90 60 310 60 340 110 L 330 190 C 300 120 100 120 70 190 Z" fill="#ff8cbf"/>
+    <ellipse cx="160" cy="205" rx="20" ry="11" fill="#2a1a1a"/><ellipse cx="240" cy="205" rx="20" ry="11" fill="#2a1a1a"/>
+    <path d="M175 290 Q 200 300 225 290" stroke="#a08a80" stroke-width="4" fill="none"/></g></g></svg>`);
   E.keyhole = k;
   return k;
 }
@@ -262,8 +266,15 @@ function buildEnd(kind) {
   const title = el('h2', 'paper-title', card, '');
   const text = el('p', 'paper-text', card, '');
   const stats = el('div', 'end-stats', card);
-  const list = menuList(card, [['retry', kind === 'win' ? 'เล่นอีกครั้ง' : 'ลองอีกครั้ง'], ['home', 'กลับหน้าแรก']], (id) => fire(id === 'retry' ? 'retry' : 'home'));
-  E[kind] = { title, text, list, stamp, stats, retryLabel: list.btns[0].querySelector('.mitem-label') };
+  const E2 = (E[kind] = { title, text, stamp, stats, card, list: null });
+  E2.build = (next, retry) => {
+    if (E2.list) E2.list.nav.remove();
+    const items = [];
+    if (next) items.push(['next', next]);
+    items.push(['retry', retry || (kind === 'win' ? 'เล่นอีกครั้ง' : 'ลองอีกครั้ง')], ['home', 'กลับหน้าแรก']);
+    E2.list = menuList(card, items, (id) => fire(id));
+  };
+  E2.build(null, null);
   return s;
 }
 
@@ -360,6 +371,7 @@ function build() {
 
 // keyboard navigation for whichever list is on screen
 let menuKeys = null, menuBusy = false;
+let lastClock = [0, 0];
 function onKey(e) {
   const scr = currentScreen;
   if (scr === 'menu') {
@@ -425,6 +437,7 @@ export const UI = {
   onRetry(cb) { if (typeof cb === 'function') cbs.retry.push(cb); },
   onHome(cb) { if (typeof cb === 'function') cbs.home.push(cb); },
   onResume(cb) { if (typeof cb === 'function') cbs.resume.push(cb); },
+  onNext(cb) { if (typeof cb === 'function') cbs.next.push(cb); },
   /** Title-screen hooks (the 3D sticky-note menu drives these). */
   setMenuKeys(h) { menuKeys = h; },
   setMenuBusy(v) { menuBusy = !!v; },
@@ -434,6 +447,8 @@ export const UI = {
   /** fn(kind) plays a UI sound: 'move' | 'select' | 'back' */
   setSound(fn) { sound = typeof fn === 'function' ? fn : () => {}; },
   get screen() { return currentScreen; },
+  /** Add a system's own overlay (breaker QTE, phone, …) to the UI root. */
+  mount(node) { (root || document.body).appendChild(node); return node; },
 
   showScreen(name, data = {}) {
     if (!root) return;
@@ -464,7 +479,7 @@ export const UI = {
       d.title.textContent = data.title || (name === 'win' ? 'รอดคืนที่ 1' : 'ไลฟ์จบแล้ว');
       d.text.textContent = data.text || '';
       d.stamp.textContent = data.stamp || (name === 'win' ? 'รอดแล้ว' : 'ไลฟ์จบ');
-      d.retryLabel.textContent = data.retry || (name === 'win' ? 'เล่นอีกครั้ง' : 'ลองอีกครั้ง');
+      d.build(data.next || null, data.retry || null);
       d.stats.replaceChildren();
       for (const [k, v] of data.stats || []) { const r = el('div', 'end-stat', d.stats); el('span', null, r, k); el('b', 'tnum', r, String(v)); }
       d.list.reset();
@@ -512,9 +527,10 @@ export const UI = {
     if (E.hideHint.textContent !== (st.hint || '')) E.hideHint.textContent = st.hint || '';
   },
 
-  /** Peek through the locked door's keyhole: an eye looks back. */
-  keyhole(ms = 1600) {
+  /** Peek through the locked door's keyhole: an eye looks back ('eye'), or the mannequin has turned ('mannequin'). */
+  keyhole(ms = 1600, variant = 'eye') {
     if (!root) return;
+    E.keyhole.classList.toggle('mannequin', variant === 'mannequin');
     restartAnim(E.keyhole, 'on');
     clearTimeout(E.keyhole._t);
     E.keyhole._t = setTimeout(() => E.keyhole.classList.remove('on'), ms);
@@ -552,8 +568,39 @@ export const UI = {
     E.reqBar.hidden = !(r.frac > 0);
   },
 
+  /** [hour, minute] last shown on the HUD clock (the phone shows it too). */
+  clockText() { return lastClock; },
+
+  /** Krasue licked the camera: green slime over everything, fading after ms. */
+  slime(ms = 10000) {
+    if (!root) return;
+    if (!E.slime) {
+      E.slime = html('div', 'slime', root, `<svg viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true"><defs>
+        <radialGradient id="sl-g" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#9aff7a" stop-opacity=".55"/><stop offset=".6" stop-color="#4ad86a" stop-opacity=".7"/><stop offset="1" stop-color="#1a6a2a" stop-opacity=".85"/></radialGradient></defs>
+        <path fill="url(#sl-g)" d="M0 0 H1600 V120 C1500 140 1480 330 1440 340 C1400 350 1390 200 1330 190 C1260 180 1250 460 1200 470 C1150 480 1150 230 1080 220 C1000 210 990 380 930 385 C870 390 880 180 800 170 C720 160 720 520 660 530 C600 540 610 240 540 230 C470 220 470 360 410 360 C350 360 360 150 290 150 C220 150 230 420 170 430 C110 440 120 200 60 190 C30 185 10 220 0 230 Z"/>
+        <path fill="url(#sl-g)" opacity=".7" d="M0 900 V760 C120 740 160 820 260 810 C360 800 380 700 480 720 C580 740 600 860 720 850 C840 840 860 740 980 760 C1100 780 1120 870 1240 860 C1360 850 1400 760 1600 780 V900 Z"/>
+        <g fill="#c8ff9a" opacity=".5"><ellipse cx="300" cy="80" rx="60" ry="14"/><ellipse cx="900" cy="60" rx="90" ry="16"/><ellipse cx="1350" cy="90" rx="50" ry="10"/><circle cx="700" cy="420" r="10"/><circle cx="1180" cy="400" r="7"/></g></svg>`);
+    }
+    restartAnim(E.slime, 'on');
+    clearTimeout(E.slime._t);
+    E.slime._t = setTimeout(() => E.slime.classList.remove('on'), ms);
+  },
+
+  /** A paper note in the middle of the screen: { title, lines: [[text, cls]], ms } */
+  sticker({ title = '', lines = [], ms = 4200 } = {}) {
+    if (!root) return;
+    if (!E.sticker) E.sticker = el('div', 'sticker', root);
+    E.sticker.replaceChildren();
+    if (title) el('b', null, E.sticker, title);
+    for (const [t, cls] of lines) el('div', cls || null, E.sticker, t);
+    restartAnim(E.sticker, 'on');
+    clearTimeout(E.sticker._t);
+    E.sticker._t = setTimeout(() => E.sticker.classList.remove('on'), ms);
+  },
+
   setClock(hour, minute = 0) {
     if (!root) return;
+    lastClock = [hour, minute];
     const txt = `${pad(hour)}:${pad(minute)}`;
     if (E.clock.textContent !== txt) {
       E.clock.textContent = txt;

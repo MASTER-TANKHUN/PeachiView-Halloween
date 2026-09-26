@@ -208,7 +208,7 @@ export function roomLiving(P, kit, M, root) {
   for (const [x, z, ry] of [[9.9 - 0.18, 6.9 - 0.18, -Math.PI * 3 / 4], [9.9 - 0.18, 1.1 + 0.18, -Math.PI / 4]]) at(x, 2.8, z, ry, () => P.cobweb(0.56), 0.3);
 
   return {
-    lights, anim,
+    lights, anim, screens: { tv: tvTex },
     itemSpots: [V(5.9, 0.5, 6.4), V(6.3, 0.46, 4.25), V(9.62, 0.56, 3.45), V(4.7, 0.81, 1.35)],
     navPoints: [V(5.0, 0, 3.2), V(8.3, 0, 2.8), V(7.6, 0, 5.2)],
     ghostSpawns: [V(8.4, 0, 2.6)],

@@ -48,7 +48,6 @@ export class Night1 extends NightBase {
     const { level, player, peachi, doors } = this;
     this.carrying = false;
     this.placed = false;
-    this.resignArmed = 0;
     this.endTried = false;
     this.musicT = 3;
     this.clockT = 0;
@@ -70,7 +69,6 @@ export class Night1 extends NightBase {
       sfx.play('whisper');
       if (!this.keyholeSeen) { this.keyholeSeen = true; setTimeout(() => this.chat(pick(HYPE), 'ในรูกุญแจมีตามองกลับมา!!!'), 1200); }
     };
-    doors.onFront = () => this._frontDoor();
 
     // headphones at a random spot, away from the player, never in the locked room
     const spots = (level.itemSpots || []).filter((s) => level.roomAt(s) !== 'bedroom');
@@ -109,6 +107,10 @@ export class Night1 extends NightBase {
       UI.toast('ถ้าพีชชี่โกรธ ซ่อนใต้เตียง ในตู้ หรือหลังม่านอาบน้ำได้ (E)');
       this.chat('มอดรุ่นพี่_RIP', 'ทิปจากรุ่นพี่: ซ่อนแล้วกลั้นหายใจนะ เธอได้ยินหมด');
     });
+    this.at(1.25, () => {
+      this.addMission({ id: 'photo1', text: 'ซุปแชต: ถ่ายรูปพีชชี่', sub: 'C / คลิกขวา ยกกล้อง แล้วคลิกถ่าย', ask: 'ถ่ายรูปพีชชี่ให้ดูหน่อยค่ะมอด! คิดถึงงง', photo: 'peachi', left: 100, reward: 30, amount: 100, thanks: 'รูปพีชชี่!! เซฟแล้ว ขอบคุณค่ะมอด' });
+      UI.toast('ซุปแชตขอรูป! กด C หรือคลิกขวา ยกกล้อง แล้วคลิกถ่าย');
+    });
     this.at(2.0, () => { this.webcam = { phase: 'wait', t: 0, shown: false }; this.chat(pick(HYPE), 'จอคอมพีชชี่ขึ้นภาพกล้องเว็บแคมแล้ว มอดไปดูหน่อยดิ'); });
     this.at(2.95, () => { if (this.webcam && this.webcam.phase === 'wait') this._webcamOff(); });
     this.at(3.0, () => {
@@ -125,6 +127,8 @@ export class Night1 extends NightBase {
       this.bot(BOT.hour5);
     });
   }
+
+  goalRows() { return [{ text: this.carrying ? OBJ_RETURN.replace(/"/g, '') : OBJ_FIND.replace(/"/g, ''), kind: 'goal' }]; }
 
   onAbort() {
     this.holder.visible = false;
@@ -157,7 +161,6 @@ export class Night1 extends NightBase {
         }
       }
     }
-    if (this.resignArmed > 0) this.resignArmed -= dt;
     this._updateWebcam(dt);
   }
 
@@ -200,12 +203,6 @@ export class Night1 extends NightBase {
   }
 
   // ---------------------------------------------------------------- jokes
-  _frontDoor() {
-    if (this.resignArmed > 0) { this.bot(BOT.resign); this.lose('resign'); return; }
-    this.resignArmed = 3;
-    UI.toast('จะลาออกจริงเหรอ? กด E อีกครั้งเพื่อออกจากบ้าน');
-  }
-
   _tryEnd() {
     this.endTried = true;
     sfx.play('endStream');

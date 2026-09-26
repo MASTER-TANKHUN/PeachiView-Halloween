@@ -1,6 +1,6 @@
 // Boot: renderer, scene, level, player, Peachi, the title menu and the director (game flow), then the
 // main loop. Debug params: ?autostart=1 (straight into the night; add &prologue=1 for the prologue),
-// ?skip=prologue, ?hour=N, ?speed=N, ?god=1, ?post=0.
+// ?night=N, ?skip=prologue, ?hour=N, ?speed=N, ?god=1, ?post=0.
 import * as THREE from 'three';
 import { buildLevel } from './level.js';
 import { Player } from './player.js';
@@ -63,6 +63,7 @@ const menu = createMenuScene({ camera, level, peachi, sfx, UI });
 const director = new Director({ scene, camera, renderer, level, player, peachi, menu, params });
 
 const game = { director, peachi, player, level, scene, camera, renderer, UI, Scream, menu, Settings, Save,
+  krasue: director.krasue, phone: director.phone, power: director.power, anomalies: director.anomalies,
   get state() { return director.state; }, get night() { return director.night; }, get paused() { return director.paused; } };
 window.__game = game;
 
@@ -96,6 +97,7 @@ UI.onStart(() => director.start());
 UI.onRetry(() => director.retry());
 UI.onHome(() => director.toMenu());
 UI.onResume(() => director.lock());
+UI.onNext(() => director.next());
 
 // ---------------------------------------------------------------- loop
 const clock = new THREE.Clock();
@@ -113,6 +115,7 @@ function frame() {
     if (!reported.has(key)) { reported.add(key); console.error('[game loop]', e); }
   }
   if (post && usePost) post.render(dt); else renderer.render(scene, camera);
+  director.afterRender(renderer.domElement);
 }
 
 if (AUTOSTART) {

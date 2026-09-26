@@ -28,6 +28,8 @@ export class Player {
     this.moving = false;
     this.running = false;
     this.sensitivity = 0.0022;
+    this.speedMul = 1;         // < 1 while carrying something awkward
+    this.blockArrows = false;  // arrow keys drive the phone instead
 
     this.onPrompt = () => {};
     this.onFlashlightToggle = () => {};
@@ -79,6 +81,7 @@ export class Player {
     };
     this._onKeyDown = (e) => {
       if (!this._enabled) return;
+      if (this.blockArrows && e.code.startsWith('Arrow')) return; // the phone uses them
       const k = MOVE_KEYS[e.code];
       if (k) this._input[k] = true;
       if (e.repeat) return;
@@ -186,7 +189,7 @@ export class Player {
     let mx = -sy * f + cy * s, mz = -cy * f - sy * s;
     const len = Math.hypot(mx, mz);
     this.running = len > 0 && inp.run;
-    const speed = this.running ? RUN : WALK;
+    const speed = (this.running ? RUN : WALK) * this.speedMul;
     if (len > 0) { mx = (mx / len) * speed; mz = (mz / len) * speed; }
     const a = 1 - Math.exp(-14 * dt);
     this.velocity.x += (mx - this.velocity.x) * a;

@@ -113,16 +113,22 @@ export const peachiLines = { happy: [], cry: [], angry: [], scream: [], stunned:
 ### Game flow (week 1 onward)
 ```
 js/main.js              boot: renderer, level, player, Peachi, title menu, Director, loop
-js/game/director.js     title → DM + prologue (first time) → night card → night → ending scene → win/lose card
+js/game/director.js     title → DM (+ prologue the first time) → night card → night → ending scene → win/lose card → next night
 js/game/save.js         localStorage 'peachi.save' (nights cleared, prologue seen, stats, achievements)
 js/game/cutscene.js     async scenes: camera moves, subtitles, waits; Enter skips
 js/game/talk.js         every spoken line: subtitle + babble voice (audio.js `voice`), Peachi's broken voice
 js/nights/base.js       shared night: clock + scripted events at(hour), viewers, chat, hiding + search, lose/win
-js/nights/night1.js     headphones, requests schedule, webcam scare 02:00, music hint 03:00, "เธอ" 04:00, ending
+js/nights/night1.js     headphones, requests schedule, photo request 01:15, webcam scare 02:00, music hint 03:00, "เธอ" 04:00, ending
+js/nights/night2.js     Krasue, anomalies → golden peach, Wi-Fi joke, blackouts 02:00/04:00, hide-and-seek 02:30, mirror 03:00, ending
 js/nights/prologue.js   DM, porch tutorial, doorbell, first meeting
 js/systems/doors.js     E doors (animated leaves + colliders), locked doors, light switches
 js/systems/hide.js      hiding spots, peek view, hold breath / stay quiet
 js/systems/requests.js  Peachi's requests (hungry, dark, lonely)
+js/systems/phone.js     Tab phone (missions / report / map / camera), camera mode, photo scoring + thumbnails
+js/systems/power.js     blackouts (level.setPower), breaker box in the kitchen, timing QTE, "bang" lure
+js/systems/anomalies.js 20 house anomalies (runtime props + overlays), report(room, kind)
+js/systems/memes.js     secret pictures of Peachi's 3D model (cork board, gold frame, fridge), Save.memes
 js/ghosts/peachi.js     Peachi AI: mood, chase, stun, teleport, search a hiding spot, jumpscare
+js/ghosts/krasue.js     Krasue: head + verlet hair/entrails, follows light through open doorways, pose, lick, Wi-Fi
 js/data/chat.js story.js   Thai text
 ```

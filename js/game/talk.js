@@ -3,8 +3,8 @@
 import { UI } from '../ui.js';
 import { voice } from '../audio.js';
 
-const NAMES = { peachi: 'พีชชี่', bot: 'PeachiBot', her: 'เธอ', me: 'มอด (คุณ)' };
-const VOICE = { peachi: 'peachi', bot: 'bot', her: 'whisper' };
+const NAMES = { peachi: 'พีชชี่', bot: 'PeachiBot', her: 'เธอ', me: 'มอด (คุณ)', krasue: 'กระสือ_Official' };
+const VOICE = { peachi: 'peachi', bot: 'bot', her: 'whisper', krasue: 'krasue' };
 const NOISE = ['▒', '░', '▓', '_', '…'];
 
 /** Break a line like a dropping stream: some clusters turn into noise, some stutter. Stays mostly readable. */

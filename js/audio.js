@@ -339,17 +339,84 @@ const recipes = {
     noise({ t, a: 0.001, rel: 0.03, vol: 0.35, filter: 'highpass', f: 3000 });
     noise({ t: t + 0.07, a: 0.001, rel: 0.05, vol: 0.25, filter: 'bandpass', f: 2000, q: 2 });
   },
-  giggle(t) {
+  bang(t) {
+    // breaker short: a crack, a buzz, sparks
+    noise({ t, a: 0.001, rel: 0.12, vol: 0.9, filter: 'lowpass', f: 3000 });
+    tone({ type: 'sine', freq: [140, 40], t, a: 0.002, rel: 0.35, vol: 0.7 });
+    tone({ type: 'sawtooth', freq: 100, t: t + 0.02, a: 0.005, hold: 0.25, rel: 0.1, vol: 0.12 });
+    for (let i = 0; i < 9; i++) noise({ t: t + 0.05 + i * rand(0.02, 0.06), a: 0.001, rel: 0.02, vol: 0.2, filter: 'highpass', f: rand(3000, 7000) });
+  },
+  powerUp(t) {
+    // relays clack, the fridge hums back, lights tick on
+    for (let i = 0; i < 3; i++) noise({ t: t + i * 0.09, a: 0.001, rel: 0.03, vol: 0.3, filter: 'bandpass', f: 1800, q: 3 });
+    tone({ type: 'sawtooth', freq: [30, 100], t: t + 0.2, a: 0.3, hold: 0.3, rel: 0.5, vol: 0.08 });
+    tone({ type: 'sine', freq: [200, 520], t: t + 0.25, a: 0.2, rel: 0.3, vol: 0.12 });
+  },
+  drip(t, o = {}) {
+    const v = o.vol ?? 1, pan = o.pan || 0;
+    tone({ type: 'sine', freq: [rand(900, 1300), rand(300, 450)], t, a: 0.002, rel: 0.09, vol: 0.2 * v, pan });
+    tone({ type: 'sine', freq: [rand(1800, 2400), 900], t: t + 0.03, a: 0.002, rel: 0.05, vol: 0.06 * v, pan });
+  },
+  whoosh(t, o = {}) {
+    noise({ t, a: 0.15, hold: 0.05, rel: 0.35, vol: 0.22 * (o.vol ?? 1), filter: 'bandpass', f: 400, f1: 1600, q: 0.8, pan: o.pan || 0 });
+  },
+  lick(t) {
+    // a long wet slurp, then goo
+    noise({ t, a: 0.05, hold: 0.35, rel: 0.2, vol: 0.45, filter: 'bandpass', f: 600, f1: 1500, q: 3 });
+    tone({ type: 'sine', freq: [180, 90], t, a: 0.05, hold: 0.3, rel: 0.2, vol: 0.2, vib: 30, vibRate: 22 });
+    for (let i = 0; i < 5; i++) tone({ type: 'sine', freq: [rand(500, 900), 200], t: t + 0.6 + i * rand(0.08, 0.16), a: 0.002, rel: 0.06, vol: 0.12 });
+  },
+  cackle(t, o = {}) {
+    // Krasue's laugh: high, nasal, "hi-hi-hiiii"
+    const pan = o.pan || 0, v = o.vol ?? 1;
+    for (let i = 0; i < 6; i++) {
+      const tt = t + i * 0.12, f = 1300 - i * 40 + (i === 5 ? 200 : 0);
+      tone({ type: 'square', freq: [f, f * 0.85], t: tt, a: 0.005, hold: i === 5 ? 0.25 : 0.03, rel: 0.06, vol: 0.05 * v, vib: 60, vibRate: 30, pan });
+      noise({ t: tt, a: 0.004, rel: 0.05, vol: 0.05 * v, filter: 'highpass', f: 4000, pan });
+    }
+  },
+  sparkle(t, o = {}) {
+    const pan = o.pan || 0, v = o.vol ?? 1;
+    [2637, 3136, 3951, 3520].forEach((f, i) => tone({ type: 'sine', freq: f, t: t + i * 0.06, a: 0.002, rel: 0.25, vol: 0.06 * v, pan }));
+  },
+  found(t) {
+    // "เจอแล้ว!" jingle
+    [784, 988, 1175, 1568].forEach((f, i) => { tone({ type: 'triangle', freq: f, t: t + i * 0.08, a: 0.004, rel: 0.2, vol: 0.2 }); tone({ type: 'sine', freq: f * 2, t: t + i * 0.08, a: 0.004, rel: 0.12, vol: 0.05 }); });
+  },
+  sting(t) {
+    // horror sting for the mirror
+    tone({ type: 'sawtooth', freq: [220, 233], t, a: 0.01, hold: 0.5, rel: 0.8, vol: 0.14, vib: 8, vibRate: 7 });
+    tone({ type: 'sawtooth', freq: [311, 330], t, a: 0.01, hold: 0.5, rel: 0.8, vol: 0.1, vib: 9, vibRate: 6 });
+    noise({ t, a: 0.005, rel: 0.6, vol: 0.2, filter: 'highpass', f: 3000 });
+    tone({ type: 'sine', freq: [80, 40], t, a: 0.005, rel: 0.8, vol: 0.5 });
+  },
+  peachShine(t) {
+    // the golden peach: a warm shimmering chord
+    [523, 659, 784, 1047].forEach((f, i) => tone({ type: 'sine', freq: f, t: t + i * 0.05, a: 0.05, hold: 0.3, rel: 1.2, vol: 0.08, vib: 4, vibRate: 5 }));
+  },
+  squelch(t) {
+    noise({ t, a: 0.01, hold: 0.1, rel: 0.25, vol: 0.4, filter: 'lowpass', f: 700, f1: 300 });
+    tone({ type: 'sine', freq: [260, 120], t, a: 0.01, rel: 0.3, vol: 0.2, vib: 40, vibRate: 25 });
+  },
+  modem(t) {
+    // the Wi-Fi joke: a tiny dial-up handshake
+    tone({ type: 'sine', freq: 1070, t, a: 0.01, hold: 0.25, rel: 0.02, vol: 0.08 });
+    tone({ type: 'sine', freq: 2100, t: t + 0.3, a: 0.01, hold: 0.2, rel: 0.02, vol: 0.07 });
+    for (let i = 0; i < 8; i++) tone({ type: 'square', freq: rand(900, 2600), t: t + 0.55 + i * 0.05, a: 0.002, rel: 0.04, vol: 0.04 });
+    noise({ t: t + 0.55, a: 0.02, hold: 0.35, rel: 0.1, vol: 0.06, filter: 'bandpass', f: 1800, q: 1 });
+  },
+  giggle(t, o = {}) {
     // cute "hi-hi-hi-hii~"
+    const pan = o.pan || 0, v = o.vol ?? 1;
     const n = 4 + Math.floor(Math.random() * 3);
     const base = rand(820, 980);
     for (let i = 0; i < n; i++) {
       const tt = t + i * 0.11;
       const f = base * (1 + (n - i) * 0.04) * (i === n - 1 ? 1.2 : 1);
       const last = i === n - 1;
-      tone({ type: 'triangle', freq: last ? [f, f * 0.8] : [f * 1.08, f], t: tt, a: 0.008, hold: last ? 0.08 : 0.02, rel: last ? 0.25 : 0.06, vol: 0.22, vib: 25, vibRate: 22 });
-      tone({ type: 'sine', freq: f * 2.01, t: tt, a: 0.008, rel: 0.05, vol: 0.05 });
-      noise({ t: tt, a: 0.005, rel: 0.04, vol: 0.05, filter: 'highpass', f: 5000 }); // breathy "h"
+      tone({ type: 'triangle', freq: last ? [f, f * 0.8] : [f * 1.08, f], t: tt, a: 0.008, hold: last ? 0.08 : 0.02, rel: last ? 0.25 : 0.06, vol: 0.22 * v, vib: 25, vibRate: 22, pan });
+      tone({ type: 'sine', freq: f * 2.01, t: tt, a: 0.008, rel: 0.05, vol: 0.05 * v, pan });
+      noise({ t: tt, a: 0.005, rel: 0.04, vol: 0.05 * v, filter: 'highpass', f: 5000, pan }); // breathy "h""
     }
   },
 };
@@ -513,6 +580,8 @@ const VOICES = {
   peachiBroken: { base: 520, spread: 0.45, dur: 0.07, gap: 0.02, type: 'triangle', formant: 1500, q: 2.5, vol: 0.18, vib: 40, broken: 0.4 },
   // PeachiBot: modem beeps, perfectly on grid
   bot: { base: 880, spread: 0.6, dur: 0.045, gap: 0.03, type: 'square', formant: 2400, q: 0.8, vol: 0.07, vib: 0, steps: [1, 1.5, 2, 1.25, 0.75] },
+  // Krasue: high, nasal, a bit too pleased with herself
+  krasue: { base: 760, spread: 0.55, dur: 0.055, gap: 0.012, type: 'square', formant: 2900, q: 2.2, vol: 0.07, vib: 28 },
   // "เธอ" and other whispers: breathy, no pitch
   whisper: { base: 300, spread: 0.2, dur: 0.08, gap: 0.03, type: 'sine', formant: 2600, q: 5, vol: 0.05, vib: 0, breath: 1 },
 };

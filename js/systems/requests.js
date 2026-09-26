@@ -118,6 +118,8 @@ export class Requests {
     this.onResult(a.kind, ok, why);
   }
 
+  noteOf(kind) { return (REQUESTS[kind] && REQUESTS[kind].note) || ''; }
+
   cancel() { if (this.active) { if (this.active.kind === 'dark') this.level.setRoomLights('stream', true); this.active = null; this.peachi.hold = false; UI.setRequest(null); } }
 
   update(dt) {
@@ -133,7 +135,7 @@ export class Requests {
     if (!a) return;
     if (peachi.isAngry) { this._finish(false); return; }
     a.left -= dt;
-    if (a.kind === 'dark' && this.level.roomLightsOn('stream')) { this._finish(true); return; }
+    if (a.kind === 'dark' && this.level.roomLit('stream')) { this._finish(true); return; }
     if (a.kind === 'lonely') {
       let rate = 0;
       if (peachi.distToPlayer < 3.2) rate = 1;
