@@ -75,12 +75,14 @@ export class Night1 extends NightBase {
     const spots = (level.itemSpots || []).filter((s) => level.roomAt(s) !== 'bedroom');
     const far = spots.filter((s) => s.distanceTo(player.position) > 6);
     const spot = (pick(far.length ? far : spots) || level.spawn.position).clone();
-    this.itemSpot = spot;
+    this.itemSpot = spot; // moves when Peachi hides them again (see _hop)
+    this.hops = 0; this.hopping = false; this.hopPings = 0;
+    this.stolen = false; this.steal = null; // the first time you walk up to them, Peachi snatches them (see _updateSteal)
     this._dropItem(spot);
     this.interact({
-      position: spot.clone(), radius: 1.6, label: '[E] เก็บหูฟังหูแมว',
+      position: () => this.itemSpot, radius: 1.6, label: '[E] เก็บหูฟังหูแมว',
       onUse: () => this._pickup(),
-      enabled: () => this.state === 'play' && !this.carrying && !this.placed,
+      enabled: () => this.state === 'play' && !this.carrying && !this.placed && !this.hopping && !this.steal,
     });
     this.interact({
       position: level.deskPosition.clone(), radius: 1.9, label: '[E] วางหูฟังคืนที่โต๊ะ',
@@ -148,18 +150,21 @@ export class Night1 extends NightBase {
   }
 
   onUpdate(dt, t) {
+    this._updateSteal(dt);
     if (!this.carrying && this.item.userData.update) this.item.userData.update(dt, t);
     // after 03:00 the clock ticks, and the lost headphones play music you can follow
     if (this.hour >= 3) {
       this.clockT -= dt;
       if (this.clockT <= 0) { this.clockT = 1.0; const p = this.panAt(CLOCK.x, CLOCK.z); if (p.dist < 9) sfx.play('tick', { pan: p.pan }); }
-      if (!this.carrying && !this.placed) {
-        this.musicT -= dt;
-        if (this.musicT <= 0) {
-          this.musicT = 5.5;
-          const p = this.panAt(this.itemSpot.x, this.itemSpot.z);
-          sfx.play('tinyMusic', { pan: p.pan, vol: Math.max(0.12, Math.min(1, 2.2 / (1 + p.dist * 0.3))) });
-        }
+    }
+    // the headphones' music: after 03:00, or for a few bars right after Peachi hid them again
+    if ((this.hour >= 3 || this.hopPings > 0) && !this.carrying && !this.placed && !this.hopping) {
+      this.musicT -= dt;
+      if (this.musicT <= 0) {
+        this.musicT = this.hour >= 3 ? 5.5 : 4;
+        if (this.hour < 3) this.hopPings--;
+        const p = this.panAt(this.itemSpot.x, this.itemSpot.z);
+        sfx.play('tinyMusic', { pan: p.pan, vol: Math.max(0.12, Math.min(1, 2.2 / (1 + p.dist * 0.3))) });
       }
     }
     this._updateWebcam(dt);
@@ -178,8 +183,102 @@ export class Night1 extends NightBase {
     this.holder.visible = true;
   }
 
+  /** A new home for the headphones: another room, away from the player. */
+  _nextSpot() {
+    const from = this.level.roomAt(this.itemSpot), pp = this.player.position;
+    const ok = (this.level.itemSpots || []).filter((s) => this.level.roomAt(s) !== 'bedroom');
+    const far = ok.filter((s) => this.level.roomAt(s) !== from && s.distanceTo(pp) > 6);
+    return pick(far.length ? far : ok);
+  }
+
+  /**
+   * The first time you walk up to the headphones (not in the last hour), Peachi pops up on the far side, grabs
+   * them, giggles and flies off backwards. They turn up in another room, playing music to follow.
+   */
+  _updateSteal(dt) {
+    const pp = this.player.position, P = this.peachi;
+    if (!this.steal) {
+      if (this.stolen || this.carrying || this.placed || this.hopping || this.hour >= 5 || P.state === 'jumpscare' || this.hide.hidden) return; // not in the last hour
+      const dx = this.itemSpot.x - pp.x, dz = this.itemSpot.z - pp.z, d = Math.hypot(dx, dz);
+      if (d > 3.5 || d < 0.3 || this.level.roomAt(pp) !== this.level.roomAt(this.itemSpot)) return;
+      // she appears beyond the headphones, opposite the way you came (kept inside the room)
+      const ux = dx / d, uz = dz / d, room = this.level.roomAt(this.itemSpot);
+      let far = 1.6, from = null;
+      for (; far > 0.4; far -= 0.3) { from = new THREE.Vector3(this.itemSpot.x + ux * far, 0, this.itemSpot.z + uz * far); if (this.level.roomAt(from) === room) break; }
+      this.stolen = true;
+      this.steal = { t: 0, from, grab: new THREE.Vector3(this.itemSpot.x + ux * 0.25, 0, this.itemSpot.z + uz * 0.25), away: new THREE.Vector3(this.itemSpot.x + ux * 3.2, 0, this.itemSpot.z + uz * 3.2), mood: P.mood, grabbed: false };
+      P.freeze();
+      P.group.visible = true; P.group.position.copy(from);
+      P._setPose('reach'); P._setExpression('happy');
+      P.lookOverride = null;
+      sfx.play('whoosh'); sfx.play('flicker');
+      this.level.setFlicker(true); setTimeout(() => this.level.setFlicker(false), 500);
+      P.line('หู… ฟัง… ของ… พีชชี่…');
+      return;
+    }
+    const S = this.steal;
+    S.t += dt;
+    const g = P.group.position;
+    const face = (tx, tz) => { P.group.rotation.y = Math.atan2(tx - g.x, tz - g.z); };
+    if (S.t < 0.7) { // glide in to the headphones
+      const k = S.t / 0.7, e = k * k * (3 - 2 * k);
+      g.lerpVectors(S.from, S.grab, e); face(pp.x, pp.z);
+    } else if (S.t < 1.8) { // grab, giggle, fly off backwards with them
+      if (!S.grabbed) {
+        S.grabbed = true;
+        sfx.play('giggle', this.panAt(g.x, g.z)); sfx.play('pickup');
+        this.chat(pick(HYPE), 'พีชชี่ขโมยหูฟังไปแล้ว 55555');
+        this.holder.scale.setScalar(0.8);
+      }
+      const k = Math.min(1, (S.t - 0.9) / 0.9), e = k * k;
+      if (S.t > 0.9) g.lerpVectors(S.grab, S.away, e);
+      g.y = Math.max(0, e * 0.6);
+      face(pp.x, pp.z);
+      this.holder.position.set(g.x, g.y + 1.05, g.z);
+    } else { // gone: the headphones turn up somewhere else
+      this.steal = null;
+      P.group.visible = false;
+      this.holder.visible = false; this.holder.scale.setScalar(1);
+      const next = this._nextSpot();
+      if (next) this.itemSpot.copy(next);
+      UI.toast('พีชชี่ขโมยหูฟังหนีไปแล้ว! ฟังเสียงเพลงจากหูฟังแล้วตามไป');
+      UI.setObjective('พีชชี่แกล้งเอาหูฟังไปซ่อน ตามเสียงเพลงไป');
+      this.hopping = true;
+      setTimeout(() => {
+        if (this.state !== 'play' || this.placed) return;
+        this._dropItem(this.itemSpot);
+        this.hopping = false; this.hopPings = 4; this.musicT = 0.5;
+        const spawns = (this.level.ghostSpawns || []).filter((s) => s.distanceTo(this.player.position) > 8);
+        P.reset(pick(spawns.length ? spawns : this.level.ghostSpawns)); P.mood = S.mood; P.active = true;
+      }, 1200);
+    }
+  }
+
+  /** After the snatch, Peachi hides them once more when you reach for them (before 04:00). */
+  _hop() {
+    this.hops++;
+    this.hopping = true;
+    const next = this._nextSpot();
+    const p = this.panAt(this.itemSpot.x, this.itemSpot.z);
+    sfx.play('giggle', { pan: p.pan }); sfx.play('whoosh');
+    UI.flash('#ffd0e8');
+    this.holder.visible = false;
+    this.peachi.line('ฮิ… ฮิ… อีก… ครั้ง… นะ…');
+    this.chat(pick(HYPE), 'หูฟังหายวับไปอีกแล้ววว พีชชี่แกล้งแน่ๆ 555');
+    UI.toast('หูฟังหายไปอีกแล้ว! ฟังเสียงเพลงแล้วตามไป (ครั้งสุดท้ายแล้ว… มั้ง)');
+    UI.setObjective('พีชชี่ซ่อนหูฟังอีกรอบ ตามเสียงเพลงไป');
+    setTimeout(() => {
+      if (this.state !== 'play' || this.placed) return;
+      if (next) this.itemSpot.copy(next);
+      this._dropItem(this.itemSpot);
+      this.hopping = false;
+      this.hopPings = 4; this.musicT = 0.5;
+    }, 1400);
+  }
+
   _pickup() {
-    if (this.state !== 'play' || this.carrying || this.placed) return;
+    if (this.state !== 'play' || this.carrying || this.placed || this.hopping || this.steal) return;
+    if (this.stolen && this.hops < 1 && this.hour < 4) { this._hop(); return; } // leaves ≥ 2 in-game hours to find them
     this.carrying = true;
     sfx.play('pickup');
     this.camera.add(this.holder); // bottom-right of the view
@@ -358,7 +457,7 @@ export class Night1 extends NightBase {
       UI.flash('#ffd0e8');
       Talk.brokenPeachi = false;
       await c.wait(0.8);
-      peachi.model.setGlow(0.35);
+      peachi.model.setGlow(0.12);
       await c.to([-5.45, 1.45, -4.1], [-6.3, 1.3, -5.4], 1.6);
       await c.say('peachi', 'ฮัลโหล? ฮัลโหลลล!', { clean: true });
       await c.say('peachi', 'มอด! ได้ยินพีชชี่แล้วใช่มั้ย!', { clean: true });

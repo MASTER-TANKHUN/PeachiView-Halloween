@@ -87,6 +87,12 @@ export class Memes {
     const fridge = polaroid('surprised', 0.16, 0.18, 0.08); fridge.position.copy(FRIDGE_AT); fridge.rotation.y = Math.PI; scene.add(fridge);
     this.open = null;
     this._dom();
+    // while the pictures are up, E / Esc closes them wherever you look (capture phase: before the player's E)
+    window.addEventListener('keydown', (e) => {
+      if (!this.open || (e.code !== 'KeyE' && e.code !== 'Escape')) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      this.close();
+    }, true);
   }
 
   get found() { return MEMES.filter((m) => Save.data.memes[m.id]).length; }
@@ -99,7 +105,7 @@ export class Memes {
       { at: new THREE.Vector3(FRIDGE_AT.x, 1.3, FRIDGE_AT.z - 0.25), r: 1.5, label: '[E] ดูรูปบนตู้เย็น', ids: ['surprised'], room: 'kitchen' },
     ];
     const here = () => night.level.roomAt(night.player.position);
-    for (const s of spots) night.interact({ position: s.at, radius: s.r, label: () => (this.open ? '[E] เก็บรูป' : s.label), onUse: () => this.show(s.ids), enabled: () => night.state === 'play' && here() === s.room });
+    for (const s of spots) night.interact({ position: s.at, radius: s.r, label: () => (this.open ? '[E] ปิดรูป (เก็บเข้าอัลบั้มแล้ว)' : s.label), onUse: () => this.show(s.ids), enabled: () => night.state === 'play' && here() === s.room });
   }
 
   show(ids) {
@@ -138,7 +144,7 @@ export class Memes {
     this.card.className = 'meme-cards';
     const note = document.createElement('div');
     note.className = 'meme-note';
-    note.textContent = 'รูปลับของพีชชี่ · กด E เก็บรูป';
+    note.textContent = 'รูปลับของพีชชี่ · เก็บเข้าอัลบั้มแล้ว ♡ กด E ปิด';
     el.append(this.card, note);
     this.el = el;
     UI.mount(el);

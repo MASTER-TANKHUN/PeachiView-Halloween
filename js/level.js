@@ -125,6 +125,15 @@ export function buildLevel(scene) {
   // ---------------- doors (E opens/closes; the story can slam them)
   const doorById = {};
   for (const d of doors) doorById[d.id] = d;
+  // things hung on a door (the front door's wreath) ride on its leaf
+  root.updateMatrixWorld(true);
+  for (const { door, group } of rooms.doorDecor || []) {
+    const d = doorById[door];
+    if (!d) { root.add(group); continue; }
+    group.updateMatrixWorld(true);
+    d.swing.updateMatrixWorld(true);
+    d.swing.attach(group);
+  }
   function moveDoor(d, dt) {
     if (d.target == null) return;
     const diff = d.target - d.angle;

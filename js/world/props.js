@@ -84,7 +84,7 @@ export function makeProps(kit, M, root) {
       const c = pal[Math.floor(rnd() * pal.length)];
       const tilt = lean && rnd() < 0.08 && x + bw + 0.05 < x1 ? -0.25 : 0;
       add('paint', S.box(bw, bh, bd), { p: [x + bw / 2 + (tilt ? bh * 0.12 : 0), y + bh / 2 - (tilt ? 0.01 : 0), 0], r: [0, 0, tilt], color: c, ao: false });
-      if (rnd() < 0.5) add('paint', S.box(bw + 0.001, 0.008, bd * 0.95), { p: [x + bw / 2, y + bh * 0.8, 0], color: 0xe8d090, ao: false });
+      if (rnd() < 0.5 && !tilt) add('paint', S.box(bw + 0.001, 0.008, bd * 0.95), { p: [x + bw / 2, y + bh * 0.8, 0], color: 0xe8d090, ao: false }); // (a leaning book skips its gold band: it would stick out)
       x += bw + 0.002 + (tilt ? 0.05 : 0);
       if (rnd() < 0.05) x += 0.06;
     }

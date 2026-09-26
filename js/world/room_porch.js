@@ -46,7 +46,21 @@ export function roomPorch(P, kit, M, root) {
     add('paint', S.cone(0.05, 0.08, 4), { p: [-14.6, GROUND + 0.94, z], r: [0, Math.PI / 4, 0], color: 0xd8d0c4 });
   }
   for (const y of [0.25, 0.7]) for (const s of [-1, 1]) add('paint', S.box(0.04, 0.06, 2.9), { p: [-14.56, GROUND + y, s * 1.98], color: 0xc8c0b4 });
-  at(-14.6, GROUND, 0.25, -0.9, () => { for (let z = -0.45; z <= 0.02; z += 0.16) add('paint', S.box(0.06, 0.95, 0.08), { p: [0, 0.47, z - 0.02], color: 0xd8d0c4 }); });
+  // gate posts either side of the opening, and the gate itself standing open toward the street
+  for (const z of [-0.6, 0.6]) {
+    add('paint', S.box(0.1, 1.12, 0.1), { p: [-14.6, GROUND + 0.56, z], color: 0xe4ddd2 });
+    add('paint', S.sphere(0.06, 12, 8), { p: [-14.6, GROUND + 1.15, z], color: 0xe4ddd2 });
+  }
+  at(-14.6, GROUND, -0.54, -1.15, () => {
+    for (let z = 0.08; z < 1.0; z += 0.14) {
+      add('paint', S.box(0.06, 0.95, 0.07), { p: [0, 0.5, z], color: 0xd8d0c4 });
+      add('paint', S.cone(0.05, 0.08, 4), { p: [0, 1.01, z], r: [0, Math.PI / 4, 0], color: 0xd8d0c4 });
+    }
+    for (const y of [0.25, 0.72]) add('paint', S.box(0.04, 0.06, 1.0), { p: [0.05, y, 0.5], color: 0xc8c0b4 });
+    add('paint', S.box(0.04, 0.05, 0.93), { p: [0.05, 0.485, 0.5], r: [-0.52, 0, 0], color: 0xc8c0b4 }); // brace
+    add('metal', S.box(0.03, 0.05, 0.05), { p: [0.02, 0.25, 0.02], color: 0x4a4a50 }); // hinges
+    add('metal', S.box(0.03, 0.05, 0.05), { p: [0.02, 0.72, 0.02], color: 0x4a4a50 });
+  });
 
   // ---------------------------------------------------------------- posts, railing, roof
   for (const z of [-Z + 0.08, Z - 0.08]) {

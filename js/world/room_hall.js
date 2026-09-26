@@ -47,7 +47,8 @@ export function roomHall(P, kit, M, root) {
   for (const x of [-6.6, -1.2, 4.2]) at(x, 0, 0, Math.PI / 2, () => P.rug(A.runnerRug(), 0.85, 3.4, { y: 0.004 }));
 
   // ---------------------------------------------------------------- entrance (west end)
-  at(-9.94, 1.55, 0, Math.PI / 2, () => { // Halloween wreath on the front door
+  // Halloween wreath on the front door: its own group, hung on the door leaf in level.js so it swings with it
+  const wreath = kit.capture(M, () => at(-9.94, 1.55, 0, Math.PI / 2, () => {
     add('fabric', S.torus(0.2, 0.05, 10, 32), { color: 0x1a1016 });
     for (let i = 0; i < 18; i++) {
       const a = i / 18 * TAU;
@@ -56,7 +57,7 @@ export function roomHall(P, kit, M, root) {
     add('fabric', S.sphere(0.05, 10, 8), { p: [0, -0.21, 0.05], s: [1.4, 0.8, 0.6], color: 0xff7a1a });
     for (const s of [-1, 1]) add('fabric', S.cone(0.03, 0.14, 6), { p: [s * 0.04, -0.29, 0.05], r: [0, 0, s * 0.3 + Math.PI], s: [1, 1, 0.3], color: 0xff7a1a });
     at(0, 0.02, 0.05, 0, () => P.bat(1.1));
-  });
+  }));
   at(-9.4, 0, 0, Math.PI / 2, () => P.rug(A.doormat(), 0.9, 0.6, { y: 0.005 }));
   // shoe rack with shoes, slippers left by the mat
   at(-9.05, 0, 0.74, Math.PI, () => {
@@ -195,6 +196,7 @@ export function roomHall(P, kit, M, root) {
 
   return {
     lights, anim,
+    doorDecor: [{ door: 'front', group: wreath }],
     itemSpots: [V(-9.05, 0.44, 0.74), V(-6.5, 0.84, -0.74), V(9.35, 0.02, 0.35)],
     navPoints: [V(-8.0, 0, 0), V(-4.0, 0, 0), V(0, 0, 0), V(4.0, 0, 0), V(8.0, 0, 0)],
     ghostSpawns: [V(8.6, 0, 0)],

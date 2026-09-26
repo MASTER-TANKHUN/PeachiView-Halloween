@@ -30,6 +30,8 @@ export class Cutscene {
   async run(fn, { skippable = false, bars = true } = {}) {
     this.active = true; this.skipping = false; this.skippable = skippable;
     this.player.enabled = false;
+    // the flashlight hangs off the camera: in a scene it would blind the shot (and bleach Peachi)
+    if (this.player.flashlight && this.player.flashlight.on) this.player.flashlight.on = false;
     this.eye.copy(this.camera.position);
     this.camera.getWorldDirection(this.look).multiplyScalar(2).add(this.eye);
     UI.setHudMode('cine');

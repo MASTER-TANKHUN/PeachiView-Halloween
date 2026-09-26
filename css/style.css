@@ -757,6 +757,7 @@ kbd {
 .boot-bar { width: min(360px, 70vw); height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; }
 .boot-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ff6fa3, #ffb36b); border-radius: 4px; transition: width 0.3s ease; }
 .boot-text { font-family: Kanit, sans-serif; font-size: 14px; color: rgba(239, 226, 242, 0.75); }
+.boot-note { margin-top: 18px; font-family: Sriracha, Mitr, sans-serif; font-size: 15px; color: rgba(255, 176, 208, 0.8); text-align: center; padding: 0 16px; }
 
 /* FPS meter (settings → แสดง FPS) */
 .fps-meter { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 900; padding: 1px 8px; font-size: 11px; color: #cfe; background: rgba(0, 0, 0, 0.5); border-radius: 8px; pointer-events: none; }

@@ -8,22 +8,22 @@ import { MEMES } from '../systems/memes.js';
 
 export const ACH = [
   { id: 'mod', name: 'I am Mod!', desc: 'ผ่านคืนที่ 1', icon: '🎧' },
-  { id: 'goldpeach', name: 'ลูกพีชทองคำ', desc: 'ผ่านคืนที่ 2', icon: '🍑' },
-  { id: 'owner', name: 'เจ้าของช่องมาเอง', desc: 'ชนะบอส PeachiBot', icon: '🔨' },
-  { id: 'halloween', name: 'Happy Halloween!', desc: 'ดูฉากจบ', icon: '🎃' },
+  { id: 'goldpeach', night: 2, name: 'ลูกพีชทองคำ', desc: 'ผ่านคืนที่ 2', icon: '🍑' },
+  { id: 'owner', night: 3, name: 'เจ้าของช่องมาเอง', desc: 'ชนะบอส PeachiBot', icon: '🔨' },
+  { id: 'halloween', night: 3, name: 'Happy Halloween!', desc: 'ดูฉากจบ', icon: '🎃' },
   { id: 'scream', name: 'กรี๊ดแตก!!!!!', desc: 'กรี๊ดรวม 50 ครั้ง', icon: '😱', count: ['screams', 50] },
   { id: 'popcat', name: 'เอาชัยชนะของประเทศไทยคืนมา', desc: 'POPCAT รวม 1,000 ครั้ง', icon: '🐱', count: ['pops', 1000] },
-  { id: 'wifi', name: 'ให้รหัส Wi-Fi แล้ว', desc: 'บอกรหัส Wi-Fi ให้กระสือ', icon: '📶' },
-  { id: 'mookata', name: 'หมูกระทะหมดแล้วนะ', desc: 'ป้อนขนมผีปอบรวม 10 ครั้ง', icon: '🍖', count: ['fed', 10] },
-  { id: 'tally', name: '1,702', desc: 'เข้าห้องแห่งการรอ', icon: '🕯️' },
-  { id: 'clip', name: 'คลิปนี้ต้องได้!', desc: 'ถ่ายรูปติดพีชชี่ กระสือ ผีปอบ และตัวปลอม', icon: '📸' },
+  { id: 'wifi', night: 2, name: 'ให้รหัส Wi-Fi แล้ว', desc: 'บอกรหัส Wi-Fi ให้กระสือ', icon: '📶' },
+  { id: 'mookata', night: 3, name: 'หมูกระทะหมดแล้วนะ', desc: 'ป้อนขนมผีปอบรวม 10 ครั้ง', icon: '🍖', count: ['fed', 10] },
+  { id: 'tally', night: 3, name: '1,702', desc: 'เข้าห้องแห่งการรอ', icon: '🕯️' },
+  { id: 'clip', night: 3, name: 'คลิปนี้ต้องได้!', desc: 'ถ่ายรูปติดพีชชี่ กระสือ ผีปอบ และตัวปลอม', icon: '📸' },
   { id: 'nolight', name: 'มอดไร้ไฟ', desc: 'ผ่านคืนไหนก็ได้โดยไม่เปิดไฟฉายเลย', icon: '🔦' },
   { id: 'quiet', name: 'ไม่ต้องกรี๊ดก็ได้', desc: 'ผ่านคืนไหนก็ได้โดยไม่กรี๊ดเลย', icon: '🤫' },
   { id: 'speed', name: 'ไลฟ์สั้นที่สุด', desc: 'ผ่านคืนที่ 1 ก่อนตีสอง', icon: '⏱️' },
-  { id: 'appeal', name: 'ยื่นอุทธรณ์สำเร็จ', desc: 'ผ่านเฟส 2 ของบอสโดยไม่โดนสไตรก์', icon: '📝' },
-  { id: 'clean', name: 'ช่องสะอาด', desc: 'ชนะบอสโดยไม่โดนสไตรก์เลย', icon: '✨' },
-  { id: 'eagle', name: 'ตาดี', desc: 'แจ้งความผิดปกติถูกรวม 10 ครั้ง', icon: '👁️', count: ['anomalies', 10] },
-  { id: 'karaoke', name: 'นักร้องประจำไลฟ์', desc: 'ร้องคาราโอเกะกับพีชชี่ผ่าน', icon: '🎤' },
+  { id: 'appeal', night: 3, name: 'ยื่นอุทธรณ์สำเร็จ', desc: 'ผ่านเฟส 2 ของบอสโดยไม่โดนสไตรก์', icon: '📝' },
+  { id: 'clean', night: 3, name: 'ช่องสะอาด', desc: 'ชนะบอสโดยไม่โดนสไตรก์เลย', icon: '✨' },
+  { id: 'eagle', night: 2, name: 'ตาดี', desc: 'แจ้งความผิดปกติถูกรวม 10 ครั้ง', icon: '👁️', count: ['anomalies', 10] },
+  { id: 'karaoke', night: 2, name: 'นักร้องประจำไลฟ์', desc: 'ร้องคาราโอเกะกับพีชชี่ผ่าน', icon: '🎤' },
   { id: 'dance', name: 'แดนซ์ตามพีชชี่', desc: 'เต้นตามพีชชี่ผ่าน', icon: '💃' },
   { id: 'memes', name: 'นักสะสมรูปลับ', desc: `เก็บรูปลับพีชชี่ครบ ${MEMES.length} รูป`, icon: '🖼️' },
   { id: 'rich', name: 'สายเปย์', desc: 'ได้เงินรวม ฿5,000', icon: '💸', count: ['earned', 5000] },
@@ -37,7 +37,7 @@ export const SHOP = [
   { id: 'battery', icon: '🔋', name: 'ถ่านก้อนใหญ่', desc: 'คืนถัดไป ไฟฉายกินแบตน้อยลง 40%', price: 100, max: 3 },
   { id: 'peach', icon: '🍑', name: 'ขนมพีช', desc: 'พีชชี่หิวเมื่อไหร่ หยิบจากกระเป๋าได้เลย ไม่ต้องไปครัว', price: 80, max: 5 },
   { id: 'amulet', icon: '🧧', name: 'ยันต์กันผี', desc: 'โดนพีชชี่จับได้ รอด 1 ครั้ง (แล้วยันต์ไหม้)', price: 249, max: 2 },
-  { id: 'soda', icon: '🥤', name: 'น้ำแดง', desc: 'คืนที่ 3: น้ำแดงในตู้เย็นเพิ่ม 1 ขวด', price: 60, max: 3 },
+  { id: 'soda', icon: '🥤', name: 'น้ำแดง', desc: 'คืนที่ 3: น้ำแดงในตู้เย็นเพิ่ม 1 ขวด', price: 60, max: 3, night: 3 },
   { id: 'mic', icon: '🎙️', name: 'ไมค์คอนเดนเซอร์', desc: 'ถาวร: กด Space น้อยลงก็กรี๊ดได้', price: 400, once: true },
   { id: 'case', icon: '📱', name: 'เคสมือถือลายพีช', desc: 'ถาวร: มือถือมอดลายลูกพีช (สวยอย่างเดียว)', price: 300, once: true },
 ];
@@ -137,7 +137,7 @@ export function mountMetaPanels({ onPick }) {
       const b = el('button', `night-pick${open ? '' : ' locked'}`, root);
       b.type = 'button'; b.disabled = !open;
       el('span', 'np-n', b, `คืนที่ ${n}`);
-      el('span', 'np-name', b, open ? name : '???');
+      el('span', 'np-name', b, Save.cleared(n) ? name : '???'); // no spoilers before it's played
       el('span', 'np-state', b, Save.cleared(n) ? 'ผ่านแล้ว ✓' : open ? `${date} · เล่นต่อ →` : 'ล็อก');
       if (open) b.addEventListener('click', () => { UI.closeMenuPanel(); onPick(n); });
     }
@@ -149,7 +149,7 @@ export function mountMetaPanels({ onPick }) {
       el('span', null, top, 'เงินมอด');
       el('b', 'tnum', top, `฿${fmt(Money.get())}`);
       el('p', 'pnote', root, 'ได้เงินจากซุปแชตกับคำขอของพีชชี่ระหว่างไลฟ์ จบคืนแล้วเงินเข้าทันที (แพ้ได้ครึ่งเดียว)');
-      for (const it of SHOP) {
+      for (const it of SHOP.filter((x) => !x.night || Save.nextNight >= x.night)) { // night-specific items once you get there
         const row = el('div', 'shop-row', root);
         el('span', 'shop-icon', row, it.icon);
         const mid = el('div', 'shop-mid', row);
@@ -179,11 +179,12 @@ export function mountMetaPanels({ onPick }) {
     const grid = el('div', 'ach-grid', root);
     for (const a of ACH) {
       const on = Ach.has(a.id);
+      const secret = !on && (a.hidden || (a.night && !Save.cleared(a.night))); // later nights stay a secret
       const c = el('div', `ach-cell${on ? ' on' : ''}`, grid);
-      el('span', 'ach-icon', c, on || !a.hidden ? a.icon : '❔');
+      el('span', 'ach-icon', c, secret ? '❔' : a.icon);
       const t = el('div', null, c);
-      el('div', 'ach-name', t, on || !a.hidden ? a.name : '???');
-      el('div', 'ach-desc', t, on || !a.hidden ? a.desc : 'ความสำเร็จลับ');
+      el('div', 'ach-name', t, secret ? '???' : a.name);
+      el('div', 'ach-desc', t, secret ? (a.night && !a.hidden ? `ความลับของคืนที่ ${a.night}` : 'ความสำเร็จลับ') : a.desc);
     }
     const memes = MEMES.filter((m) => Save.data.memes[m.id]);
     el('div', 'chead', root, `รูปลับพีชชี่ ${memes.length}/${MEMES.length}`);

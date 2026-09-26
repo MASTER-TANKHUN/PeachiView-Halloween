@@ -192,6 +192,7 @@ export class Director {
     if (this.cut.active) this.cut.skip();
     Talk.stop();
     this.player.enabled = false;
+    if (this.player.flashlight) this.player.flashlight.on = false; // not into the title screen
     this.state = 'menu';
     this.paused = false;
     if (document.pointerLockElement) document.exitPointerLock();

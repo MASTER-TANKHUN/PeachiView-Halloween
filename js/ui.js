@@ -107,6 +107,7 @@ function buildSettings(parent) {
   const form = el('div', 'sform', parent);
   const s = Settings.get();
   const row = (label, note) => { const r = el('div', 'srow', form); const l = el('div', 'slab', r); el('div', 'sname', l, label); if (note) el('div', 'snote', l, note); return el('div', 'sctl', r); };
+  const sync = []; // the title's page and the pause page are two copies: both follow every change
   const slider = (label, key, min, max, step, show, note) => {
     const c = row(label, note);
     const inp = el('input', 'srange', c); inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = s[key];
@@ -114,11 +115,13 @@ function buildSettings(parent) {
     const paint = () => inp.style.setProperty('--p', `${((inp.value - min) / (max - min)) * 100}%`);
     paint();
     inp.addEventListener('input', () => { out.textContent = show(+inp.value); paint(); Settings.set({ [key]: +inp.value }); });
+    sync.push((cur) => { if (+inp.value !== +cur[key] && document.activeElement !== inp) { inp.value = cur[key]; out.textContent = show(+inp.value); paint(); } });
     return inp;
   };
   const choice = (label, key, opts, note) => {
     const c = row(label, note), seg = el('div', 'sseg', c);
-    const bs = opts.map(([v, t]) => { const b = el('button', 'sopt', seg, t); b.type = 'button'; b.addEventListener('click', () => { sound('move'); Settings.set({ [key]: v }); bs.forEach((x) => x.classList.toggle('on', x === b)); }); b.classList.toggle('on', s[key] === v); return b; });
+    const bs = opts.map(([v, t]) => { const b = el('button', 'sopt', seg, t); b.type = 'button'; b.addEventListener('click', () => { sound('move'); Settings.set({ [key]: v }); }); b.classList.toggle('on', s[key] === v); return b; });
+    sync.push((cur) => bs.forEach((b, i) => b.classList.toggle('on', cur[key] === opts[i][0])));
   };
   slider('ระดับเสียง', 'volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}`);
   slider('ความไวเมาส์', 'sensitivity', 0.4, 2, 0.05, (v) => v.toFixed(2));
@@ -130,6 +133,7 @@ function buildSettings(parent) {
   choice('โหมดสตรีมเมอร์', 'streamer', [[false, 'ปิด'], [true, 'เปิด']], 'เสียงตุ้งแช่เบาลง แสงวาบน้อยลง (เสียงทั้งเกมแต่งเอง ไม่ติดลิขสิทธิ์)');
   choice('ปรับความละเอียดอัตโนมัติ', 'autoRes', [[true, 'เปิด'], [false, 'ปิด']], 'ถ้า FPS ตก เกมจะลดความละเอียดให้เอง');
   choice('แสดง FPS', 'showFps', [[false, 'ซ่อน'], [true, 'แสดง']]);
+  Settings.onChange((cur) => { for (const f of sync) f(cur); });
   return form;
 }
 function buildHowto(parent) {

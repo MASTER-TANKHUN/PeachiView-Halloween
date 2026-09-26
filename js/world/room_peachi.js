@@ -308,12 +308,12 @@ export function roomPeachi(P, kit, M, root) {
         add('fabric', S.cone(0.08, 0.14, 16), { p: [s * 0.16, 0.9, 0], r: [0, 0, -s * 0.3], s: [1, 1, 0.45], color: PINK2 });
         add('fabric', S.cone(0.05, 0.09, 14), { p: [s * 0.155, 0.88, 0.022], r: [0, 0, -s * 0.3], s: [1, 1, 0.3], color: WHITE });
       }
-      // a witch hat hung on one ear
-      at(0.2, 1.0, 0.02, 0, () => {
+      // a witch hat worn on one ear (the ear pokes up inside the cone)
+      at(0.16, 0.845, 0, 0, () => {
         add('fabric', S.cyl(0.15, 0.15, 0.01, 28), { color: 0x1a1024 });
-        add('fabric', S.cone(0.08, 0.26, 24), { p: [0.02, 0.13, 0], r: [0, 0, -0.35], color: 0x1a1024 });
-        add('fabric', S.cyl(0.082, 0.082, 0.03, 24), { p: [0, 0.02, 0], color: 0x8a4ac8 });
-      }, 0, -0.35);
+        add('fabric', S.cone(0.09, 0.28, 24), { p: [0, 0.14, 0], r: [0, 0, -0.12], color: 0x1a1024 });
+        add('fabric', S.cyl(0.092, 0.092, 0.03, 24), { p: [0, 0.02, 0], color: 0x8a4ac8 });
+      }, 0, -0.3);
     }, -0.12);
     for (const s of [-1, 1]) {
       add('plastic', S.rbox(0.04, 0.2, 0.06, 0.01), { p: [s * 0.3, 0.52, -0.02], color: 0x2a2a30 });
