@@ -7,6 +7,7 @@ let master = null;
 let limiter = null;
 let noiseBuf = null;
 let masterLevel = 0.5;
+let duck = 0;
 
 function ensure() {
   if (ctx) {
@@ -493,7 +494,14 @@ export const sfx = {
   },
   setMaster(v) {
     masterLevel = Math.max(0, Math.min(MASTER_CAP, Number(v) || 0));
-    if (master) master.gain.setTargetAtTime(masterLevel, ctx.currentTime, 0.05);
+    if (master) master.gain.setTargetAtTime(masterLevel * (1 - duck), ctx.currentTime, 0.05);
+  },
+  /** Everything quieter, 0..1 (the boss's "muted for copyright" rings). */
+  setDuck(k) {
+    const v = Math.max(0, Math.min(0.9, Number(k) || 0));
+    if (Math.abs(v - duck) < 0.02) return;
+    duck = v;
+    if (master) master.gain.setTargetAtTime(masterLevel * (1 - duck), ctx.currentTime, 0.15);
   },
   names: Object.keys(recipes),
 };

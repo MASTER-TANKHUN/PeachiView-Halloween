@@ -5,7 +5,8 @@
 // from 02:30, a Krasue cameo, the walking mannequin at 03:00. Rain all night.
 // Script: Phi Pop walks in 00:00 · red light green light 01:00 · the mirror 02:00 · the fake 02:30 ·
 // "เธอ" + the mannequin 03:00 · the strap hint 03:30 · the Room of Waiting 04:00 · 05:00 PeachiBot wakes up
-// (the boss fight comes next week: for now a "to be continued" scene once the choker is complete).
+// and, with the choker complete, the boss fight (game/boss.js). Win it → the normal ending (game/ending.js).
+// Losing to the boss retries from the boss.
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { NightBase, pick, rand, randInt } from './base.js';
@@ -20,6 +21,8 @@ import { RedLight } from '../systems/redlight.js';
 import { WaitingRoom, TABLE as WAIT_TABLE } from '../world/waiting.js';
 import { buildPendant, buildStrap, buildLock, buildChokerSet } from '../world/choker.js';
 import { art } from '../world/tex.js';
+import { Boss } from '../game/boss.js';
+import { Save } from '../game/save.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const HYPE = ['ลูกพีชน้อย_249', 'peachlover', 'นอนไม่หลับ', 'ลูกพีชซ่า', 'mod_ตัวจริง', 'แม่นาค_ตัวจริง'];
@@ -80,6 +83,10 @@ export class Night3 extends NightBase {
     this.sign.position.copy(SIGN_AT); this.sign.visible = false; scene.add(this.sign);
     this.mirrors = [];
     this.snacks = { count: SNACKS, take: () => this._takeSnack() };
+    this.boss = new Boss({ scene, level, player: this.player, camera: this.camera });
+    this.boss.onWin = () => this._bossWon();
+    this.boss.onDelete = () => this.lose('deleted');
+    this.bossCheckpoint = false;
   }
 
   introCard() {
@@ -101,6 +108,11 @@ export class Night3 extends NightBase {
     this.thunderT = rand(8, 16);
     this.rlDone = false; this.rlWant = false;
     this.teased = false;
+    this.bossOn = false;
+    this.runId = (this.runId || 0) + 1;
+    const checkpoint = !!(this.retrying && this.bossCheckpoint) || this.params?.get('boss') === '1'; // ?night=3&boss=1: debug
+    this.retrying = false;
+    this.bossCheckpoint = checkpoint;
     this.inWaiting = false;
     this.hungerShown = null;
     this.stats.fed = 0; this.stats.sodas = 0; this.stats.fakes = 0;
@@ -200,13 +212,29 @@ export class Night3 extends NightBase {
       this.level.setFlicker(true);
       setTimeout(() => { if (this.state === 'play' && !this.peachi.isAngry) this.level.setFlicker(false); }, 2600);
       this.bot(BOT.n3Hour5);
-      if (this._count('placed') >= 3) this._teaser();
+      if (this._count('placed') >= 3) this._startBoss();
       else UI.toast('ตีห้าแล้ว! รีบเอาชิ้นส่วนไปวางที่โต๊ะสตรีมให้ครบ');
     });
+    if (checkpoint) this._fromCheckpoint();
+  }
+
+  /** "สู้บอสอีกครั้ง": 05:00 with the choker on the desk, straight into the fight. */
+  _fromCheckpoint() {
+    this.time = 5 * this.secondsPerHour;
+    UI.setClock(5, 0);
+    for (const ev of this.events) ev.done = true;
+    for (const k of ['pendant', 'strap', 'lock']) { this.pieces[k] = 'placed'; this.deskSet.userData.parts[k].visible = true; }
+    this.deskSet.visible = true;
+    this.pop.reset(); this.fake.stop(); this.mannequin.reset();
+    this.player.position.set(-4.2, this.player.position.y, -3.2);
+    this.teased = true;
+    setTimeout(() => this.state === 'play' && this._beginFight(), 1200);
   }
 
   onAbort() {
     this._cleanup();
+    this.boss.stop();
+    this.bossOn = false;
     this.pop.reset();
     this.fake.stop();
     this.mannequin.reset();
@@ -222,6 +250,7 @@ export class Night3 extends NightBase {
   }
 
   _cleanup() {
+    this.boss.halt();
     this.redlight.stop();
     this.hand.visible = false;
     this.player.speedMul = 1;
@@ -235,7 +264,8 @@ export class Night3 extends NightBase {
 
   requestPool() { return ['hungry', 'lonely', 'dark', 'karaoke', 'dance', 'popcat', 'photo']; }
   requestAllowed(k) { return k !== 'hungry' || this.snacks.count > 0; } // her snacks come off the same rack
-  requestsPaused() { return this.redlight.active; }
+  requestsPaused() { return this.redlight.active || this.bossOn; }
+  clockPaused() { return this.bossOn; }
   get karaokeSong() { return 'halloween'; }
   canPray() { return !this.soda.held; } // with red soda in hand, the shrine is for Phi Pop
   boardAnswer() {
@@ -254,6 +284,7 @@ export class Night3 extends NightBase {
   }
 
   loseCard(reason) {
+    if (reason === 'deleted') return { title: 'ช่องถูกลบ', stamp: '©×3', text: 'Copyright strike ครบ 3 ครั้ง PeachiBot ลบช่องแล้วเปิดใหม่ชื่อ "PeachiBot Official" … แต่ยังสู้ต่อได้นะมอด', retry: 'สู้บอสอีกครั้ง' };
     if (reason === 'timeout') return { title: 'ตีหก… ไลฟ์ถาวร', text: 'โชคเกอร์ยังไม่ครบ 3 ชิ้น ไลฟ์ครบ 249 ชั่วโมงแล้ว PeachiBot เปลี่ยนชื่อช่องเป็น "PeachiBot 24/7"' };
     return super.loseCard(reason);
   }
@@ -306,6 +337,7 @@ export class Night3 extends NightBase {
   onScream() {
     super.onScream();
     if (this.state !== 'play' || this.hide.hidden) return;
+    if (this.bossOn) { this.boss.onScream(); return; }
     const pp = this.player.position;
     if (this.pop.active && Math.hypot(this.pop.position.x - pp.x, this.pop.position.z - pp.z) < 7 && this.pop.stun(2)) this.chat(pick(HYPE), 'ผีปอบสะดุ้ง 555');
     if (this.fake.active && Math.hypot(this.fake.position.x - pp.x, this.fake.position.z - pp.z) < 7) this.fake.burst('scream', this.player);
@@ -325,6 +357,11 @@ export class Night3 extends NightBase {
   onUpdate(dt, t) {
     const ctx = this._ghostCtx();
     const { player, camera } = this;
+    if (this.bossOn) {
+      this.boss.update(dt, t);
+      this.viewers = Math.max(this.viewers, 60); // the boss is the threat, not the viewer count
+      return;
+    }
     this.pop.update(dt, t, ctx);
     if (this.state !== 'play') return;
     this.fake.update(dt, t, ctx);
@@ -359,6 +396,7 @@ export class Night3 extends NightBase {
   }
 
   idleUpdate(dt, t) {
+    this.boss.fx(dt);
     this.waiting.update(dt, t, this.player);
     if (this.krasue.visible) this.krasue.update(dt, t, {});
   }
@@ -490,7 +528,7 @@ export class Night3 extends NightBase {
       sfx.play('peachShine');
       UI.flash('#ffc0dc');
       this.peachi.line('ครบแล้ว!! โชคเกอร์ครบ 3 ชิ้น… ตีห้าบอทจะตื่น อยู่ด้วยกันก่อนนะมอด', 4200);
-      if (this.hour >= 5) setTimeout(() => this._teaser(), 1200);
+      if (this.hour >= 5) setTimeout(() => this._startBoss(), 1200);
     } else UI.toast(`วางชิ้นส่วนแล้ว ${total}/3`);
     this._objective();
   }
@@ -592,19 +630,44 @@ export class Night3 extends NightBase {
     setTimeout(() => this.state === 'play' && this.peachi.line('ทุกคน… รอพีชชี่อยู่ตลอดเลยเหรอ… ขอโทษนะที่หายไปนาน', 4200), 5200);
   }
 
-  // ---------------------------------------------------------------- 05:00: PeachiBot wakes up (to be continued)
-  async _teaser() {
+  // ---------------------------------------------------------------- 05:00: PeachiBot wakes up → the boss
+  hideDeskPieces() { for (const k of ['pendant', 'strap', 'lock']) this.deskSet.userData.parts[k].visible = false; }
+  showDeskPiece(k) { this.deskSet.userData.parts[k].visible = true; }
+
+  async _startBoss() {
     if (this.teased || this.state !== 'play') return;
     this.teased = true;
+    this.bossOn = true; // stops the clock, requests and the other ghosts
     this.pop.leave(); this.chat(POP_USER, 'หมดเวลาคอลแลปแล้ว… ตาไปก่อนนะหลาน');
-    await this.win({ clear: false });
-  }
-
-  async winScene() {
-    const { cut, peachi, level } = this;
-    Talk.stop();
     this.fake.stop();
     this.mannequin.reset();
+    if (this.krasue.active) this.krasue.leave(9999);
+    this.redlight.stop();
+    this.requests.cancel();
+    if (this.games) this.games.stop(true);
+    if (this.poll) { if (this.poll.ui) this.poll.ui.close(-1); this.poll = null; }
+    this.peachi.freeze();
+    const run = this.runId = (this.runId || 0) + 1;
+    try { await this._bossIntro(); } catch (e) { console.error('[boss intro]', e); }
+    if (run !== this.runId || this.state !== 'play') return;
+    this._beginFight();
+  }
+
+  _beginFight() {
+    this.bossOn = true;
+    this.bossCheckpoint = true;
+    this.peachi.freeze();
+    const pg = this.peachi.group;
+    pg.visible = true; pg.position.set(-3.2, 0, -5.6); pg.rotation.y = -0.6;
+    this.peachi._setPose('float'); this.peachi._setExpression('angry');
+    this.level.setRoomLights('stream', true);
+    UI.setObjective('สู้กับ PeachiBot! (แบนสแปม · อุทธรณ์ © · ตะโกนสะท้อนค้อน)');
+    this.boss.start({ desk: this.deskSet.position.clone().add(V(0, 0.1, 0)), night: this });
+  }
+
+  async _bossIntro() {
+    const { cut, peachi, level } = this;
+    Talk.stop();
     await cut.run(async (c) => {
       await c.fade(1, 450);
       level.setFlicker(false);
@@ -614,8 +677,6 @@ export class Night3 extends NightBase {
       peachi.group.rotation.y = 0.35;
       peachi._setPose('float'); peachi._setExpression('happy');
       peachi.lookOverride = null;
-      this.deskSet.visible = true;
-      for (const k of ['strap', 'pendant', 'lock']) this.deskSet.userData.parts[k].visible = true;
       c.set([-5.2, 1.5, -3.2], [-6.0, 1.1, -5.9]);
       await c.fade(0, 700);
       await c.say('peachi', 'โชคเกอร์ครบแล้ว… ถ้าใส่มันได้ พีชชี่จะกลับมาเป็นตัวเองเต็มตัว', { hold: 3000 });
@@ -627,26 +688,55 @@ export class Night3 extends NightBase {
       await c.say('bot', BOT.claim, { hold: 3800 });
       this.bot(BOT.claim);
       c.shake = 0;
-      await c.say('bot', 'ผีเคลม © จะมาพบท่านในอีกไม่ช้าค่ะ :)', { hold: 2600 });
       level.setFlicker(false);
       await c.to([-5.45, 1.45, -4.1], [-6.3, 1.3, -5.4], 1.0);
       peachi._setExpression('angry');
       await c.say('peachi', 'บอทนั่น… พีชชี่เป็นคนสร้างมันเองแหละ ตอนนั้นแค่อยากแกล้งคนเล่น', { hold: 3200 });
       await c.say('peachi', 'มอด… ช่วยพีชชี่อีกครั้งนะ ครั้งสุดท้ายแล้ว', { hold: 2800 });
-      sfx.play('powerDown');
-      await c.fade(1, 900);
+      sfx.play('glitch', { n: 18 });
+      await c.say('bot', 'PeachiBot v2.49 ออนไลน์ค่ะ :) เริ่มไลฟ์ถาวร', { hold: 2400 });
     }, { skippable: true });
     UI.subtitle(null);
     UI.fade(0, 10);
   }
 
-  winCard() {
-    return {
-      title: 'คืนที่ 3 · ยังไม่จบ',
-      stamp: 'ต่อ…',
-      text: 'โชคเกอร์หัวใจครบ 3 ชิ้น แต่ PeachiBot ตื่นเต็มตัวแล้ว บอสผีเคลม © และรุ่งเช้าของวันฮาโลวีน มาในอัปเดตถัดไป',
-      retry: 'เล่นคืนนี้อีกครั้ง',
-    };
+  async _bossWon() {
+    if (this.state !== 'play') return;
+    this.state = 'cutscene';
+    this.bossOn = false;
+    this.bossCheckpoint = false;
+    this._end();
+    this.peachi.freeze();
+    Save.addStats({ screams: this.stats.screams, bans: this.stats.bans, requests: this.stats.requests, nightsPlayed: 1 });
+    Save.clearNight(3);
+    try { await this._bossWinScene(); } catch (e) { console.error('[boss win]', e); }
+    if (this.state !== 'cutscene') return; // aborted meanwhile
+    this.state = 'won';
+    this.onEnd('ending');
+  }
+
+  async _bossWinScene() {
+    const { cut, peachi, level } = this;
+    Talk.stop();
+    await cut.run(async (c) => {
+      c.set([-4.0, 1.6, -3.0], [-5.4, 1.8, -4.6]);
+      sfx.play('glitch', { n: 20 });
+      await c.say('bot', 'ข้อผิดพลาด: ไม่พบสิทธิ์ ©… ไม่พบ… ขออภัยในความไม่สะดวก…', { hold: 2600 });
+      peachi.group.visible = true; peachi.group.position.set(-3.6, 0, -4.9); peachi.group.rotation.y = -1.1;
+      peachi._setPose('float'); peachi._setExpression('angry');
+      await c.say('peachi', 'ในฐานะเจ้าของช่อง… พีชชี่ขอแบน PeachiBot ถาวร!', { hold: 2800 });
+      sfx.play('ban'); sfx.play('peachShine');
+      UI.flash('#ff9ad0'); UI.shake(500);
+      this.boss.shatter();
+      await c.wait(1.6);
+      this.deskSet.visible = false;
+      peachi._setExpression('happy');
+      sfx.play('sparkle');
+      await c.to([-4.6, 1.5, -3.6], [-3.6, 1.4, -4.9], 1.0);
+      await c.say('peachi', 'ใส่โชคเกอร์แล้ว… รู้สึกเหมือนได้ตัวเองคืนมาเลย', { hold: 2800 });
+      await c.fade(1, 900);
+    }, { skippable: true });
+    UI.subtitle(null);
   }
 
   statRows() {

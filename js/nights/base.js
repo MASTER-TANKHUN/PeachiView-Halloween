@@ -165,7 +165,7 @@ export class NightBase {
   _end() {
     if (this.memes) this.memes.close();
     if (this.games) this.games.stop(true);
-    if (this.poll) { this.poll.close(-1); this.poll = null; }
+    if (this.poll) { if (this.poll.ui) this.poll.ui.close(-1); this.poll = null; }
     if (this.power) this.power.close(true);
     if (this.phone) { this.phone.close(); this.phone.lower(); }
     this.hide.reset();
@@ -429,6 +429,7 @@ export class NightBase {
       }
       return;
     }
+    if (this.requestsPaused()) return; // no new polls during red light / the boss
     this.pollT -= dt;
     if (this.pollT > 0 || this.missions.some((m) => m.room && !m.done)) return;
     const here = this.level.roomAt(this.player.position);
@@ -496,7 +497,7 @@ export class NightBase {
     const hidden = this.hide.hidden || this.inSafeRoom();
 
     // --- clock + script
-    if (!jumpscaring) {
+    if (!jumpscaring && !this.clockPaused()) {
       this.time += dt * this.speed;
       if (this.time >= this.total) { UI.setClock(END_HOUR, 0); this.lose('timeout'); return; }
       const hour = Math.floor(this.hour);
@@ -553,6 +554,8 @@ export class NightBase {
   idleUpdate() {}
   /** A room ghosts won't enter (Night 3's Room of Waiting). */
   inSafeRoom() { return false; }
+  /** The clock and the night's script hold (Night 3's boss fight). */
+  clockPaused() { return false; }
   /** Another ghost is doing its jumpscare (stop the clock and the rest). */
   otherJumpscare() { return false; }
   /** While a jumpscare plays: keep that ghost animating. */

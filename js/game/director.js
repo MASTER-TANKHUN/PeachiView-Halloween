@@ -60,7 +60,8 @@ export class Director {
     this.prologue = new Prologue(ctx);
     for (const n of Object.values(this.nights)) {
       n.nextLabel = this.nights[n.number + 1] ? `ไปต่อคืนที่ ${n.number + 1}` : null;
-      n.onEnd = () => {
+      n.onEnd = (kind) => {
+        if (kind === 'ending') { this.playEnding(n.statRows()); return; } // Night 3's boss is down
         this.state = 'end';
         this.paused = false;
         if (document.pointerLockElement) document.exitPointerLock();
@@ -160,6 +161,7 @@ export class Director {
     ++this.run;
     try { sfx.init(); } catch (e) { /* already */ }
     this.night.abort();
+    this.night.retrying = true; // Night 3 restarts from the boss if it was lost there
     this.startNight();
     if (!this.autostart) this.lock();
   }

@@ -670,3 +670,17 @@ kbd {
 .cr-line.sub { color: var(--muted); } .cr-line.h { font-family: var(--f-head); font-weight: 600; color: #ffd23a; margin-top: 6px; } .cr-line.note { font-size: 14px; color: var(--muted); }
 .end-sting { background: #000; gap: 14px; } .sting-live { color: #ff3b4f; font-family: var(--f-head); font-weight: 700; animation: blink 0.5s steps(2) infinite; }
 .sting-wave { font-size: 80px; filter: brightness(0); } .sting-text { color: var(--muted); }
+
+/* Night 3 boss: PeachiBot's bar, the phase line, three copyright strikes; the "muted" banner */
+.boss-hud { position: absolute; left: 50%; top: 66px; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); padding: 10px 14px 9px; background: rgba(8, 12, 16, 0.86); border: 1px solid rgba(125, 255, 200, 0.35); border-radius: 12px; font-family: var(--f-head); z-index: 30; pointer-events: none; }
+.boss-hud.hidden, .boss-muted.hidden { display: none; }
+.bh-name { font-weight: 700; font-size: 16px; color: #7dffc8; letter-spacing: 0.02em; }
+.bh-name small { font-weight: 500; font-size: 12px; color: #ff8a98; margin-left: 6px; }
+.bh-bar { height: 8px; margin: 6px 0 5px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; }
+.bh-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff3b4f, #ff7ac8); transition: width 0.3s ease; }
+.bh-phase { font-size: 13px; color: var(--text); }
+.bh-strikes { position: absolute; right: 12px; top: 9px; display: flex; gap: 4px; }
+.bh-strikes span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: rgba(255, 255, 255, 0.25); border: 1px solid rgba(255, 255, 255, 0.2); }
+.bh-strikes span.on { background: #ff2446; color: #fff; border-color: #ff2446; box-shadow: 0 0 10px #ff2446; }
+.boss-muted { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); padding: 10px 18px; background: rgba(20, 4, 8, 0.88); border: 1px solid #ff2446; border-radius: 10px; color: #ffd0d8; font-family: var(--f-head); font-size: 17px; text-align: center; z-index: 30; pointer-events: none; }
+.boss-muted small { display: block; font-size: 12.5px; color: #ff9aa8; margin-top: 3px; }
