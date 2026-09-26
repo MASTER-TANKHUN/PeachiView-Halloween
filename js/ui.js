@@ -381,7 +381,8 @@ function build() {
   el('div', 'fx-bar top', E.bars); el('div', 'fx-bar bottom', E.bars);
   E.skip = el('div', 'fx-skip', root);
   el('kbd', null, E.skip, 'Space'); el('span', null, E.skip, 'ไปต่อ');
-  el('kbd', null, E.skip, 'Enter'); el('span', null, E.skip, 'ข้ามฉาก');
+  E.skipAll = el('span', 'fx-skip-all', E.skip);
+  el('kbd', null, E.skipAll, 'Enter'); el('span', null, E.skipAll, 'ข้ามฉาก');
   buildKeyhole(root);
   E.black = el('div', 'fx-black', root);
   E.screens = { menu: buildMenu(), pause: buildPause(), intro: buildIntro(), dm: buildDM(), gameover: buildEnd('gameover'), win: buildEnd('win') };
@@ -587,7 +588,8 @@ export const UI = {
     return new Promise((r) => { fadeTimer = setTimeout(r, ms); });
   },
   letterbox(on) { if (root) root.classList.toggle('cine', !!on); },
-  skipHint(on) { if (root) E.skip.classList.toggle('on', !!on); },
+  /** Cutscene corner hint: false = hidden, 'next' = "Space ไปต่อ", 'all' = also "Enter ข้ามฉาก" (seen before). */
+  skipHint(mode) { if (!root) return; E.skip.classList.toggle('on', !!mode); E.skipAll.hidden = mode !== 'all'; },
   /** 'full' | 'prologue' (clock, objective and toasts only) | 'cine' (nothing) */
   setHudMode(mode) { if (root) root.dataset.hud = mode || 'full'; },
   setNight(label) { if (root) E.night.textContent = label; },

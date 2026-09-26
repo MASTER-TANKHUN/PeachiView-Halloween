@@ -700,7 +700,7 @@ export class Night3 extends NightBase {
       await c.say('peachi', 'มอด… ช่วยพีชชี่อีกครั้งนะ ครั้งสุดท้ายแล้ว', { hold: 2800 });
       sfx.play('glitch', { n: 18 });
       await c.say('bot', 'PeachiBot v2.49 ออนไลน์ค่ะ :) เริ่มไลฟ์ถาวร', { hold: 2400 });
-    }, { skippable: true });
+    }, { skippable: true, id: 'boss-intro' });
     UI.subtitle(null);
     UI.fade(0, 10);
   }
@@ -743,7 +743,7 @@ export class Night3 extends NightBase {
       await c.to([-4.6, 1.5, -3.6], [-3.6, 1.4, -4.9], 1.0);
       await c.say('peachi', 'ใส่โชคเกอร์แล้ว… รู้สึกเหมือนได้ตัวเองคืนมาเลย', { hold: 2800 });
       await c.fade(1, 900);
-    }, { skippable: true });
+    }, { skippable: true, id: 'boss-win' });
     UI.subtitle(null);
   }
 

@@ -16,6 +16,7 @@ function fresh() {
     counts: {},             // lifetime counters for achievements (screams, pops, fed, earned, …)
     inv: {},                // shop items: id → how many (permanent ones: 1)
     photos: [],             // the best photo of each night won: { url, caption, score } (≤ 12)
+    scenes: {},             // cutscenes watched to the end: id → 1 (only those can be skipped with Enter)
   };
 }
 

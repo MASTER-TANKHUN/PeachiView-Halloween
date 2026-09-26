@@ -724,7 +724,7 @@ export class Night2 extends NightBase {
       await c.say('peachi', 'คืนพรุ่งนี้ฮาโลวีน คืนสุดท้าย… มอดต้องมานะ สัญญา!', { hold: 2800 });
       sfx.play('powerDown');
       await c.fade(1, 900);
-    }, { skippable: true });
+    }, { skippable: true, id: 'n2-win' });
     peachi.model.setDesat(0);
     krasue.reset();
     UI.subtitle(null);

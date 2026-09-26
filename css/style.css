@@ -663,6 +663,7 @@ kbd {
 .es-stats div { display: flex; justify-content: space-between; gap: 16px; } .es-stats b { font-family: var(--f-hand); font-weight: 400; }
 .es-row { display: flex; gap: 14px; margin-top: 8px; }
 .credits-roll { justify-content: flex-start; overflow: hidden; background: #07040a; cursor: pointer; }
+.credits-roll.no-skip { cursor: default; }
 .cr-inner { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 100vh; animation: roll 24s linear forwards; }
 @keyframes roll { to { transform: translateY(-100%); } }
 .cr-line { font-size: 19px; color: #e8dcef; } .cr-line.gap { height: 36px; }

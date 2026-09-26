@@ -62,7 +62,7 @@ export class Ending {
       await c.to([-5.6, 1.4, -5.9], [-5.73, 1.15, -6.66], 1.2);
       sfx.play('endStream');
       await c.fade(1, 800);
-    }, { skippable: true });
+    }, { skippable: true, id: 'ending' });
     UI.subtitle(null);
     Save.data.endings.normal = Date.now(); Save.set({ lastWish: wish[0] });
     Ach.unlock('halloween');
@@ -146,14 +146,18 @@ export class Ending {
       const inner = el('div', 'cr-inner', R);
       for (const [cls, text] of CREDITS) el('div', `cr-line ${cls}`, inner, text || '');
       R.classList.add('on');
-      const skip = (e) => { if (e.code === 'Enter' || e.code === 'Escape' || e.type === 'click') done(); };
-      const done = () => {
+      const seen = Save.data.scenes || {};
+      const canSkip = !!seen.credits; // like the scenes: skippable once watched to the end
+      const skip = (e) => { if (canSkip && (e.code === 'Enter' || e.code === 'Escape' || e.type === 'click')) done(); };
+      const done = (whole) => {
         window.removeEventListener('keydown', skip); R.removeEventListener('click', skip); clearTimeout(this._crT);
         R.classList.remove('on');
+        if (whole === true && !seen.credits) Save.set({ scenes: { ...(Save.data.scenes || {}), credits: 1 } });
         resolve();
       };
       window.addEventListener('keydown', skip); R.addEventListener('click', skip);
-      this._crT = setTimeout(done, 26000);
+      R.classList.toggle('no-skip', !canSkip);
+      this._crT = setTimeout(() => done(true), 26000);
     });
   }
 
@@ -238,7 +242,7 @@ export class Ending {
       sfx.play('giggle');
       await ng(c);
       await c.fade(1, 500);
-    }, { skippable: true });
+    }, { skippable: true, id: 'bloopers' });
     this.onSet = null;
     B.root.classList.remove('on');
     UI.subtitle(null);
@@ -277,7 +281,6 @@ export class Ending {
     el('div', 'bl-clap-top', clap);
     el('div', 'bl-clap-text', clap, 'แอ็กชั่น!');
     const ng = el('div', 'bl-ng', bl, 'NG!');
-    el('div', 'bl-hint', bl, 'Enter ข้าม');
     this.bl = { root: bl, take, clap, ng };
     UI.mount(r);
   }

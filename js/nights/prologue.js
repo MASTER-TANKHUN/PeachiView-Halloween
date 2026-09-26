@@ -147,7 +147,7 @@ export class Prologue {
       await c.say('peachi', 'หูฟัง… หาย… ได้ยินแชตไม่ชัดเลย', { hold: 2800 });
       await c.say('peachi', 'ช่วยหา… ก่อนเช้า… นะ', { hold: 2600 });
       await c.say('bot', 'ยินดีต้อนรับมอดคนใหม่ค่ะ! ไลฟ์มาแล้ว 246 ชั่วโมง กรุณาอย่าสแปมนะคะ :)', { hold: 3400 });
-    }, { skippable: true });
+    }, { skippable: true, id: 'prologue-meet' });
     UI.subtitle(null);
     this.active = false;
     this.step = null;

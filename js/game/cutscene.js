@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { UI } from '../ui.js';
 import { Talk } from './talk.js';
+import { Save } from './save.js';
 
 const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0);
@@ -47,7 +48,10 @@ export class Cutscene {
   }
 
   /** Run an async scene: fn(cut) → Promise. Resolves when it ends. */
-  async run(fn, { skippable = false, bars = true } = {}) {
+  /** id: the scene's name in the save; Enter can skip it only once it has been watched to the end. */
+  async run(fn, { skippable = false, bars = true, id = null } = {}) {
+    const seen = Save.data.scenes || {};
+    if (id) skippable = skippable && !!seen[id];
     this.active = true; this.skipping = false; this.skippable = skippable;
     this.player.enabled = false;
     // the flashlight hangs off the camera: in a scene it would blind the shot (and bleach Peachi)
@@ -56,9 +60,11 @@ export class Cutscene {
     this.camera.getWorldDirection(this.look).multiplyScalar(2).add(this.eye);
     UI.setHudMode('cine');
     UI.letterbox(bars);
-    UI.skipHint(skippable);
+    UI.skipHint(skippable ? 'all' : 'next');
     UI.setPrompt(null);
-    try { await fn(this); } finally {
+    let finished = false;
+    try { await fn(this); finished = true; } finally {
+      if (finished && id && !seen[id]) Save.set({ scenes: { ...seen, [id]: 1 } });
       this.active = false; this.skipping = false;
       this.move = null; this.waits.forEach((w) => w.resolve()); this.waits = [];
       this._endLine();

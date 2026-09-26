@@ -477,7 +477,7 @@ export class Night1 extends NightBase {
       await c.say('peachi', 'พรุ่งนี้มาอีกนะมอด ห้ามหนีล่ะ!', { hold: 2600 });
       sfx.play('powerDown');
       await c.fade(1, 900);
-    }, { skippable: true });
+    }, { skippable: true, id: 'n1-win' });
     UI.subtitle(null);
     UI.fade(0, 10);
   }
