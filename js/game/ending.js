@@ -5,6 +5,7 @@
 import { UI } from '../ui.js';
 import { sfx } from '../audio.js';
 import { Save } from './save.js';
+import { Ach } from './meta.js';
 
 const el = (tag, cls, parent, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; if (parent) parent.appendChild(n); return n; };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -60,6 +61,7 @@ export class Ending {
     }, { skippable: true });
     UI.subtitle(null);
     Save.data.endings.normal = Date.now(); Save.set({ lastWish: wish[0] });
+    Ach.unlock('halloween');
     // cards
     UI.fade(1, 10);
     await this._card('ended');

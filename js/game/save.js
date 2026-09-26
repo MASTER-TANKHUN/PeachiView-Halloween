@@ -13,6 +13,9 @@ function fresh() {
     stats: { screams: 0, bans: 0, requests: 0, deaths: 0, nightsPlayed: 0 },
     endings: {},            // id → timestamp
     memes: {},              // secret Peachi pictures found around the house: id → timestamp
+    counts: {},             // lifetime counters for achievements (screams, pops, fed, earned, …)
+    inv: {},                // shop items: id → how many (permanent ones: 1)
+    photos: [],             // the best photo of each night won: { url, caption, score } (≤ 12)
   };
 }
 
@@ -64,6 +67,12 @@ export const Save = {
     this.data.memes[id] = Date.now();
     write();
     return true;
+  },
+  addPhoto(p) {
+    if (!p || !p.url) return;
+    this.data.photos.push({ url: p.url, caption: p.caption, score: p.score });
+    while (this.data.photos.length > 12) this.data.photos.shift();
+    write();
   },
   reset() { data = fresh(); write(); },
 };

@@ -88,6 +88,7 @@ export class MiniGames {
   }
   _finish(ok) {
     const g = this.game, cb = this.onDone;
+    if (this.onResult) try { this.onResult(g, ok, this); } catch (e) { /* achievements only */ }
     this.stop();
     if (cb) cb(ok, g);
   }

@@ -9,6 +9,7 @@ import { Talk } from '../game/talk.js';
 import { Save } from '../game/save.js';
 import * as chatData from '../data/chat.js';
 import { BOT, LOSE } from '../data/story.js';
+import { Ach, Money, Shop } from '../game/meta.js';
 
 const { normalChat, spamChat, superChats } = chatData;
 export const START_VIEWERS = 249;
@@ -71,7 +72,7 @@ export class NightBase {
     this.sleepyChatDone = false;
     this.caughtReason = 'caught';
     this.boredT = 0;
-    this.stats = { screams: 0, bans: 0, requests: 0, maxViewers: START_VIEWERS, hides: 0, closeCalls: 0, photos: 0, bestPhoto: 0 };
+    this.stats = { screams: 0, bans: 0, requests: 0, maxViewers: START_VIEWERS, hides: 0, closeCalls: 0, photos: 0, bestPhoto: 0, money: 0 };
     this.missions = []; // super-chat missions: { id, text, sub, left, reward, photo: subject kind, room, done }
     this.reqTimer = 999;  // Peachi's next request (the night starts the clock)
     this.lastReq = null;
@@ -94,6 +95,7 @@ export class NightBase {
       player.pitch = 0;
     }
     if (player.flashlight) { player.flashlight.battery = 100; player.flashlight.on = false; }
+    player.usedLight = false;
     player.enabled = true;
 
     const gs = level.ghostSpawns || [];
@@ -135,7 +137,42 @@ export class NightBase {
     this.paused = false;
     this.onStart();
     this._attachExtras(); // after onStart: the night's own items decide where batteries can't go
+    this._useItems();
     for (const ev of this.events) if (ev.at < this.hour) ev.done = true;
+  }
+
+  /** What the mod bought at ร้านลูกพีช (meta.js). */
+  _useItems() {
+    const { player } = this;
+    player.drainMul = Shop.use('battery') ? 0.6 : 1;
+    if (player.drainMul < 1) setTimeout(() => this.state === 'play' && UI.toast('ใส่ถ่านก้อนใหญ่แล้ว ไฟฉายอึดขึ้น 🔋'), 2500);
+    this.requests.pocketSnack = () => Shop.use('peach');
+    Scream.boost = Shop.has('mic') ? 1.5 : 1;
+    if (this.phone && this.phone.setCase) this.phone.setCase(Shop.has('case') ? 'peach' : null);
+    this.amuletUsed = false;
+  }
+
+  /** Night over: pay the super chats (half if lost), count achievements, keep the best photo. */
+  _payout(won, reason) {
+    const s = this.stats;
+    s.paid = Math.round((s.money || 0) * (won ? 1 : 0.5)) + (won ? 100 * this.number : 0);
+    Money.add(s.paid);
+    Ach.count('screams', s.screams);
+    Ach.count('fed', s.fed || 0);
+    if (won) {
+      if (!this.player.usedLight) Ach.unlock('nolight');
+      if (!s.screams) Ach.unlock('quiet');
+      if (this.number === 1) { Ach.unlock('mod'); if (this.hour < 2) Ach.unlock('speed'); }
+      if (this.number === 2) Ach.unlock('goldpeach');
+      Save.addPhoto(this._highlights()[0]);
+    }
+    if (reason === 'resign') Ach.unlock('resign');
+    if (reason === 'deleted') Ach.unlock('deleted');
+  }
+
+  /** The night's best three photos (for the end card). */
+  _highlights() {
+    return (this.phone ? this.phone.photos : []).filter((p) => p.url && p.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
   }
 
   abort() {
@@ -181,13 +218,22 @@ export class NightBase {
   lose(reason) {
     if (this.state !== 'play') return;
     if (this.god && reason !== 'resign') { this.peachi.reset(pick(this.level.ghostSpawns)); this.peachi.active = true; this.player.enabled = true; UI.toast('[god] รอด'); return; }
+    if ((reason === 'caught' || reason === 'found') && !this.amuletUsed && Shop.use('amulet')) { // ยันต์กันผี
+      this.amuletUsed = true;
+      this.peachi.reset(pick(this.level.ghostSpawns)); this.peachi.active = true; this.player.enabled = true;
+      UI.flash('#ffd27a'); sfx.play('incense');
+      UI.toast('ยันต์กันผีช่วยไว้! (ยันต์ไหม้หมดแล้ว)');
+      this.chat(pick(HYPE_USERS), 'ยันต์ของจริง!! รอดแบบงงๆ');
+      return;
+    }
     this.state = 'lost';
     this._end();
+    this._payout(false, reason);
     Save.addStats({ deaths: 1 });
     if (reason !== 'caught' && reason !== 'found') sfx.play('lose');
     if (reason === 'timeout') { this.peachi._setExpression('scream'); UI.flash('#ff2a6d'); UI.shake(600); }
     const L = this.loseCard(reason);
-    UI.showScreen('gameover', { ...L, stats: this.statRows() });
+    UI.showScreen('gameover', { ...L, stats: this.statRows(), photos: this._highlights() });
     this.onEnd('gameover', reason);
   }
 
@@ -199,10 +245,11 @@ export class NightBase {
     this.peachi.freeze();
     Save.addStats({ screams: this.stats.screams, bans: this.stats.bans, requests: this.stats.requests, nightsPlayed: 1 });
     if (clear) Save.clearNight(this.number);
+    this._payout(true);
     try { await this.winScene(); } catch (e) { console.error('[win scene]', e); }
     if (this.state !== 'cutscene') return; // aborted meanwhile
     this.state = 'won';
-    UI.showScreen('win', { ...this.winCard(), stats: this.statRows(), next: this.nextLabel || null });
+    UI.showScreen('win', { ...this.winCard(), stats: this.statRows(), next: this.nextLabel || null, photos: this._highlights() });
     this.onEnd('win');
   }
 
@@ -222,6 +269,7 @@ export class NightBase {
       ['ทำตามคำขอพีชชี่', `${s.requests} ครั้ง`],
       ['กรี๊ด', `${s.screams} ครั้ง`],
       ['แบนแชตผี', `${s.bans} ข้อความ`],
+      ['เงินเข้ากระเป๋า', `฿${(s.paid ?? s.money ?? 0).toLocaleString('en-US')}`],
     ];
   }
 
@@ -259,6 +307,7 @@ export class NightBase {
   }
   onPhoto(photo) {
     this.stats.photos++;
+    Ach.photographed(photo.hits.filter((h) => h.score > 0).map((h) => h.kind));
     this.stats.bestPhoto = Math.max(this.stats.bestPhoto, photo.score);
     if (photo.score > 0) {
       this._addViewers(Math.min(40, Math.round(photo.score / 5)));
@@ -473,6 +522,7 @@ export class NightBase {
   _onRequest(kind, ok, why) {
     if (ok) {
       this.stats.requests++;
+      this.stats.money += 10;
       this._addViewers(randInt(10, 20));
       this.chat(pick(HYPE_USERS), why === 'joke' ? '555555 ผักบุ้งเนี่ยนะ' : pick(['มอดใจดีจัง', 'พีชชี่ยิ้มแล้ววว', 'น่ารักกก']));
     } else {

@@ -27,7 +27,7 @@ function onKey(e) {
   // keep the page from scrolling; ignore auto-repeat so it must be mashed
   if (!e.target?.closest?.('input,textarea')) e.preventDefault();
   if (e.repeat || !Scream.enabled || Scream.cooldown > 0) return;
-  Scream.charge = Math.min(1, Scream.charge + CHARGE_PER_PRESS);
+  Scream.charge = Math.min(1, Scream.charge + CHARGE_PER_PRESS * (Scream.boost || 1)); // the shop's mic: 1.5
   if (Scream.charge >= 1) fire();
 }
 

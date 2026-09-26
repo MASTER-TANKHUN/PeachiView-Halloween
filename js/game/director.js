@@ -25,6 +25,8 @@ import { Night2 } from '../nights/night2.js';
 import { Night3 } from '../nights/night3.js';
 import { Prologue } from '../nights/prologue.js';
 import { NIGHT_DM } from '../data/story.js';
+import { Ach, mountMetaPanels } from './meta.js';
+import { MEMES } from '../systems/memes.js';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const INTRO_MS = 4600;
@@ -67,6 +69,15 @@ export class Director {
         if (document.pointerLockElement) document.exitPointerLock();
       };
     }
+    // money + achievements from the shared systems (meta.js)
+    UI.chat.onSuper = (amount) => { if (this.state === 'play' && this.night.state === 'play') this.night.stats.money += amount; };
+    this.games.onResult = (game, ok, g) => {
+      if (game === 'popcat') Ach.count('pops', g.pops || 0);
+      if (ok && (game === 'karaoke' || game === 'dance')) Ach.unlock(game);
+    };
+    this.memes.onFound = () => { if (MEMES.every((m) => Save.data.memes[m.id])) Ach.unlock('memes'); };
+    this.chosenNight = null; // night select on the title
+    mountMetaPanels({ onPick: (n) => { this.chosenNight = n; this.menu.go(); } });
     Talk.listener = () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw });
     Scream.onScream(() => { if (this.state === 'play') this.night.onScream(); });
     window.addEventListener('keydown', (e) => {
@@ -96,7 +107,9 @@ export class Director {
     try { sfx.init(); } catch (e) { /* no audio */ }
     if (Settings.get().mic) Promise.resolve(Scream.init()).catch(() => {}); // the permission prompt shows during the DM
     const skipParam = this.params.get('skip') === 'prologue';
-    let n = this.pickNight();
+    const chosen = this.chosenNight;
+    this.chosenNight = null;
+    let n = chosen || this.pickNight();
     let choice = 'skip';
     if (n === 1) {
       if (!skipParam) {
@@ -104,7 +117,7 @@ export class Director {
         choice = await this.prologue.dm(Save.data.prologueSeen);
         if (run !== this.run) return;
       }
-    } else if (!this.params.get('night')) {
+    } else if (!this.params.get('night') && !chosen) {
       // a returning player: this night's DM, with the cleared nights to replay
       this.state = 'dm';
       const beyond = Save.nextNight > this.maxNight;

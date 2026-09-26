@@ -46,6 +46,9 @@ export class Phone {
   /** Photo-taking or phone use shouldn't happen right now (cutscene, hidden, QTE…). */
   get busy() { return this.cameraUp; }
 
+  /** The shop's phone case ('peach' or null). */
+  setCase(kind) { this.root.classList.toggle('case-peach', kind === 'peach'); }
+
   reset() {
     this.close();
     this.lower();

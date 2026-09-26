@@ -50,11 +50,15 @@ const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const now = () => performance.now();
 const fire = (k, ...a) => { for (const f of cbs[k]) f(...a); };
 
-function clearedNight1() {
+/** The title footer's progress line ("ผ่านแล้ว 2/3 คืน · ฿420"), or null for a new player. */
+function progressLine() {
   try {
     const d = JSON.parse(localStorage.getItem('peachi.save') || 'null');
-    return !!(d && Array.isArray(d.nightsCleared) && d.nightsCleared.includes(1)) || !!localStorage.getItem('peachi.nightCleared');
-  } catch { return false; }
+    const n = d && Array.isArray(d.nightsCleared) ? d.nightsCleared.length : 0;
+    if (!n && !(d && d.money)) return null;
+    const ach = d && d.achievements ? Object.keys(d.achievements).length : 0;
+    return `${d.endings && d.endings.normal ? 'จบเกมแล้ว ♡' : `ผ่านแล้ว ${n}/3 คืน`} · ฿${fmt(d.money || 0)}${ach ? ` · ความสำเร็จ ${ach}` : ''}`;
+  } catch { return null; }
 }
 function restartAnim(node, cls) {
   node.classList.remove(cls);
@@ -180,6 +184,7 @@ function buildSheet(parent, owner, panels) {
 function openPanel(owner, id) {
   const sh = owner === 'menu' ? E.menuSheet : E.pauseSheet;
   for (const [k, v] of Object.entries(sh.nodes)) v.node.hidden = k !== id;
+  if (sh.nodes[id].render) sh.nodes[id].render(sh.nodes[id].node);
   sh.title.textContent = sh.nodes[id].title;
   sh.sheet.classList.add('open');
   sh.sheet.parentElement.classList.add('panel-open');
@@ -265,8 +270,9 @@ function buildEnd(kind) {
   const stamp = el('div', 'stamp', card, kind === 'win' ? 'รอดแล้ว' : 'ไลฟ์จบ');
   const title = el('h2', 'paper-title', card, '');
   const text = el('p', 'paper-text', card, '');
+  const shots = el('div', 'end-shots', card); // the night's best photos, taped on like polaroids
   const stats = el('div', 'end-stats', card);
-  const E2 = (E[kind] = { title, text, stamp, stats, card, list: null });
+  const E2 = (E[kind] = { title, text, stamp, stats, shots, card, list: null });
   E2.build = (next, retry) => {
     if (E2.list) E2.list.nav.remove();
     const items = [];
@@ -432,7 +438,7 @@ export const UI = {
     if (root) return;
     const host = document.getElementById('hud') || document.body;
     host.appendChild(build());
-    E.menuCleared.hidden = !clearedNight1();
+    { const pl = progressLine(); E.menuCleared.hidden = !pl; E.menuCleared.textContent = pl || ''; }
     window.addEventListener('keydown', onKey);
     requestAnimationFrame(loop);
     this.showScreen('menu');
@@ -447,6 +453,17 @@ export const UI = {
   setMenuKeys(h) { menuKeys = h; },
   setMenuBusy(v) { menuBusy = !!v; },
   openMenuPanel(id) { openPanel('menu', id); },
+  closeMenuPanel() { closePanel('menu'); },
+  /** Re-read the title footer's progress line (after a purchase). */
+  refreshProgress() { const pl = progressLine(); E.menuCleared.hidden = !pl; E.menuCleared.textContent = pl || ''; },
+  /** Another page for the title's notebook; render(node) runs every time it opens. */
+  addMenuPanel(id, title, render) {
+    const sh = E.menuSheet;
+    if (!sh || sh.nodes[id]) return;
+    const n = el('div', 'panel-' + id, sh.sheet.querySelector('.sheet-body'));
+    n.hidden = true;
+    sh.nodes[id] = { node: n, title, render };
+  },
   menuPanelOpen() { return !!menuPanel; },
   requestStart() { fire('start'); },
   /** fn(kind) plays a UI sound: 'move' | 'select' | 'back' */
@@ -469,7 +486,7 @@ export const UI = {
     if (document.activeElement && root.contains(document.activeElement)) document.activeElement.blur();
     if (name === 'menu') {
       closePanel('menu'); menuBusy = false;
-      E.menuCleared.hidden = !clearedNight1();
+      { const pl = progressLine(); E.menuCleared.hidden = !pl; E.menuCleared.textContent = pl || ''; }
     } else if (name === 'pause') {
       closePanel('pause'); E.pauseList.reset();
     } else if (name === 'intro') {
@@ -485,6 +502,17 @@ export const UI = {
       d.text.textContent = data.text || '';
       d.stamp.textContent = data.stamp || (name === 'win' ? 'รอดแล้ว' : 'ไลฟ์จบ');
       d.build(data.next || null, data.retry || null);
+      d.shots.replaceChildren();
+      const photos = (data.photos || []).filter((p) => p && p.url);
+      d.shots.hidden = !photos.length;
+      if (photos.length) el('div', 'end-shots-h', d.shots, 'ไฮไลต์คืนนี้');
+      photos.forEach((p, i) => {
+        const f = el('figure', 'end-shot', d.shots);
+        f.style.setProperty('--r', `${[-4, 3, -2][i] || 0}deg`);
+        const img = el('img', null, f); img.src = p.url; img.alt = p.caption || '';
+        el('figcaption', null, f, p.caption || '');
+        if (p.score) el('b', 'tnum', f, `+${p.score}`);
+      });
       d.stats.replaceChildren();
       for (const [k, v] of data.stats || []) { const r = el('div', 'end-stat', d.stats); el('span', null, r, k); el('b', 'tnum', r, String(v)); }
       d.list.reset();
@@ -746,6 +774,7 @@ export const UI = {
       if (her) type = 'spam';
       const line = el('div', `chat-msg chat-${type}${her ? ' chat-her' : ''}`);
       if (type === 'superchat') {
+        if (amount && typeof UI.chat.onSuper === 'function') UI.chat.onSuper(amount);
         line.classList.add(scTier(amount));
         const head = el('div', 'sc-head', line);
         el('span', 'sc-user', head, user);

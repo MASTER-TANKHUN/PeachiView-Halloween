@@ -118,6 +118,10 @@ export class Requests {
       sfx.play('powerDown');
     }
     this.peachi.hold = kind === 'lonely' || !!R.hold;
+    if (kind === 'hungry' && !this.snack && this.pocketSnack && this.pocketSnack()) { // the shop's peach snack
+      this.snack = { name: 'ขนมพีช', line: 'ขนมพีชจากร้านลูกพีช! อร่อยที่สุดในโลกเลยยย' };
+      setTimeout(() => UI.toast('หยิบขนมพีชจากกระเป๋า! เอาไปให้พีชชี่ได้เลย'), 1800);
+    }
     if (kind === 'photo') { this.peachi._setExpression('happy'); }
     this._say(pick(R.ask));
     sfx.play('notify');

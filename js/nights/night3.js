@@ -23,6 +23,7 @@ import { buildPendant, buildStrap, buildLock, buildChokerSet } from '../world/ch
 import { art } from '../world/tex.js';
 import { Boss } from '../game/boss.js';
 import { Save } from '../game/save.js';
+import { Ach } from '../game/meta.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const HYPE = ['ลูกพีชน้อย_249', 'peachlover', 'นอนไม่หลับ', 'ลูกพีชซ่า', 'mod_ตัวจริง', 'แม่นาค_ตัวจริง'];
@@ -86,6 +87,7 @@ export class Night3 extends NightBase {
     this.boss = new Boss({ scene, level, player: this.player, camera: this.camera });
     this.boss.onWin = () => this._bossWon();
     this.boss.onDelete = () => this.lose('deleted');
+    this.boss.onAppeal = () => Ach.unlock('appeal');
     this.bossCheckpoint = false;
   }
 
@@ -623,6 +625,7 @@ export class Night3 extends NightBase {
   }
   _enterWaiting() {
     this.waiting.enter();
+    Ach.unlock('tally');
     this.hide.reset();
     this.chat(pick(HYPE), 'ห้องนี้คือ…');
     setTimeout(() => this.state === 'play' && this.chat('ลูกพีชน้อย_1702', 'ขีดบนผนังพวกนี้… 1,702 วันที่รอเลยเหรอ'), 1600);
@@ -709,6 +712,9 @@ export class Night3 extends NightBase {
     this.peachi.freeze();
     Save.addStats({ screams: this.stats.screams, bans: this.stats.bans, requests: this.stats.requests, nightsPlayed: 1 });
     Save.clearNight(3);
+    this._payout(true);
+    Ach.unlock('owner');
+    if (!this.boss.strikes) Ach.unlock('clean');
     try { await this._bossWinScene(); } catch (e) { console.error('[boss win]', e); }
     if (this.state !== 'cutscene') return; // aborted meanwhile
     this.state = 'won';

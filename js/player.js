@@ -29,6 +29,7 @@ export class Player {
     this.running = false;
     this.sensitivity = 0.0022;
     this.speedMul = 1;         // < 1 while carrying something awkward
+    this.drainMul = 1;         // flashlight battery drain (the shop's big battery: 0.6)
     this.blockArrows = false;  // arrow keys drive the phone instead
 
     this.onPrompt = () => {};
@@ -171,7 +172,8 @@ export class Player {
 
     // battery
     if (this._flOn) {
-      fl.battery = Math.max(0, fl.battery - DRAIN * dt);
+      fl.battery = Math.max(0, fl.battery - DRAIN * this.drainMul * dt);
+      this.usedLight = true;
       if (fl.battery <= 0) this._setFlashlight(false);
     }
     fl.battery = Math.min(100, fl.battery);

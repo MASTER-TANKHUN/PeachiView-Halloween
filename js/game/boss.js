@@ -230,7 +230,7 @@ export class Boss {
   }
 
   _phase2() {
-    this.phase = 2; this.pt = 0; this.claimT = 0;
+    this.phase = 2; this.pt = 0; this.claimT = 0; this.strikes2 = this.strikes;
     this._setFace('claim');
     this.night.bot('ตรวจพบเนื้อหาที่มีลิขสิทธิ์: โชคเกอร์หัวใจ ×3 · ดำเนินการเคลมค่ะ ©');
     sfx.play('sting');
@@ -245,6 +245,7 @@ export class Boss {
   }
 
   _phase3() {
+    if (this.strikes === this.strikes2 && this.onAppeal) this.onAppeal();
     this.phase = 3; this.pt = 0; this.swing = 'rest'; this.st = 1.5; this.deflects = 0; this.screamedAt = -9;
     this._setFace('angry');
     this.night.bot('อุทธรณ์ถูกปฏิเสธค่ะ :) เตรียมแบนถาวร');

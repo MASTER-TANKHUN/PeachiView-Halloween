@@ -105,6 +105,7 @@ export class Memes {
   show(ids) {
     if (this.open) { this.close(); return; }
     const fresh = ids.filter((id) => Save.findMeme(id));
+    if (fresh.length && this.onFound) this.onFound();
     this.card.replaceChildren();
     this.card.classList.toggle('grid', ids.length > 1);
     for (const id of ids) {

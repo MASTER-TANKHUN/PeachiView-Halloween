@@ -15,6 +15,7 @@ import { Talk } from '../game/talk.js';
 import { BOT, HER, KRASUE, STORIES, LOSE } from '../data/story.js';
 import { ROOM_NAMES, KINDS } from '../systems/anomalies.js';
 import { BREAKER } from '../systems/power.js';
+import { Ach } from '../game/meta.js';
 
 const HYPE = ['ลูกพีชน้อย_249', 'peachlover', 'นอนไม่หลับ', 'ลูกพีชซ่า', 'mod_ตัวจริง'];
 const NEED = 5;                                   // correct reports for the golden peach
@@ -291,6 +292,7 @@ export class Night2 extends NightBase {
     const r = this.anomalies.report(room, kind);
     if (r.ok) {
       this.stats.reports++;
+      Ach.count('anomalies', 1);
       this._addViewers(10);
       this.peachi.mood = Math.max(0, this.peachi.mood - 10);
       this.bot(pick(BOT.rightReport));
@@ -417,6 +419,7 @@ export class Night2 extends NightBase {
   _sendWifi() {
     if (!this.wifiKnown || this.wifiUsed || !this.krasue.active) return;
     this.wifiUsed = true;
+    Ach.unlock('wifi');
     this.chat('มอด (คุณ)', `รหัส Wi-Fi: ${WIFI_PW}`);
     sfx.play('modem');
     setTimeout(() => {
