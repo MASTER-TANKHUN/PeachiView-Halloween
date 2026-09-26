@@ -405,6 +405,56 @@ const recipes = {
     for (let i = 0; i < 8; i++) tone({ type: 'square', freq: rand(900, 2600), t: t + 0.55 + i * 0.05, a: 0.002, rel: 0.04, vol: 0.04 });
     noise({ t: t + 0.55, a: 0.02, hold: 0.35, rel: 0.1, vol: 0.06, filter: 'bandpass', f: 1800, q: 1 });
   },
+  bash(t, o = {}) {
+    // a heavy fist on a wooden door
+    const pan = o.pan || 0, v = o.vol ?? 1;
+    tone({ type: 'sine', freq: [95, 38], t, a: 0.002, rel: 0.35, vol: 0.9 * v, pan });
+    noise({ t, a: 0.001, hold: 0.02, rel: 0.2, vol: 0.5 * v, filter: 'lowpass', f: 900, pan });
+    for (let i = 0; i < 3; i++) noise({ t: t + 0.05 + i * 0.04, rel: 0.03, vol: 0.1 * v, filter: 'bandpass', f: rand(1500, 3500), q: 5, pan });
+  },
+  doorBreak(t, o = {}) {
+    const pan = o.pan || 0;
+    tone({ type: 'sine', freq: [80, 25], t, a: 0.002, rel: 0.8, vol: 1, pan });
+    noise({ t, a: 0.001, hold: 0.08, rel: 0.6, vol: 0.8, filter: 'lowpass', f: 2200, pan });
+    for (let i = 0; i < 10; i++) noise({ t: t + 0.05 + i * rand(0.03, 0.09), rel: rand(0.03, 0.08), vol: 0.22, filter: 'bandpass', f: rand(800, 4000), q: 3, pan }); // splinters
+  },
+  burp(t, o = {}) {
+    // long, proud, disgusting
+    const pan = o.pan || 0, v = o.vol ?? 1;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 420; f.Q.value = 2.5; f.connect(out(null, pan));
+    tone({ type: 'sawtooth', freq: [120, 70], t, a: 0.04, hold: 0.7, rel: 0.3, vol: 0.5 * v, vib: 18, vibRate: 13, dest: f });
+    noise({ t, a: 0.05, hold: 0.6, rel: 0.3, vol: 0.18 * v, filter: 'bandpass', f: 380, q: 3, pan });
+  },
+  gulp(t, o = {}) {
+    const pan = o.pan || 0;
+    for (let i = 0; i < 4; i++) tone({ type: 'sine', freq: [rand(260, 340), rand(120, 160)], t: t + i * 0.32, a: 0.01, rel: 0.12, vol: 0.28, pan });
+  },
+  chomp(t, o = {}) {
+    const pan = o.pan || 0, v = o.vol ?? 1;
+    noise({ t, a: 0.001, rel: 0.05, vol: 0.4 * v, filter: 'bandpass', f: rand(1200, 2600), q: 1.5, pan });
+    tone({ type: 'sine', freq: [180, 90], t, a: 0.002, rel: 0.08, vol: 0.25 * v, pan });
+  },
+  musicBox(t, o = {}) {
+    // the room of waiting: a slow, fragile music-box phrase
+    const v = (o.vol ?? 1) * 0.12, pan = o.pan || 0;
+    const tune = [659, 784, 880, 784, 659, 587, 523, 587, 659, 523];
+    tune.forEach((f, i) => { tone({ type: 'sine', freq: f * 2, t: t + i * 0.42, a: 0.003, rel: 1.4, vol: v, pan }); tone({ type: 'triangle', freq: f * 4.01, t: t + i * 0.42, a: 0.002, rel: 0.4, vol: v * 0.25, pan }); });
+  },
+  thunder(t, o = {}) {
+    const v = o.vol ?? 1;
+    noise({ t, a: 0.02, hold: 0.2, rel: 2.6, vol: 0.55 * v, filter: 'lowpass', f: 400, f1: 90 });
+    noise({ t: t + 0.08, a: 0.01, rel: 0.4, vol: 0.25 * v, filter: 'lowpass', f: 2500 });
+    tone({ type: 'sine', freq: [55, 30], t, a: 0.05, hold: 0.4, rel: 2.0, vol: 0.4 * v });
+  },
+  pageFlip(t) { noise({ t, a: 0.01, hold: 0.05, rel: 0.12, vol: 0.2, filter: 'bandpass', f: 3000, f1: 1500, q: 1 }); },
+  smoke(t, o = {}) {
+    // the fake bursts into smoke: a reversed hiss and a glassy chord
+    noise({ t, a: 0.35, hold: 0.05, rel: 0.1, vol: 0.35, filter: 'bandpass', f: 800, f1: 5000, q: 1, pan: o.pan || 0 });
+    [311, 330, 622].forEach((f) => tone({ type: 'sine', freq: [f, f * 0.5], t: t + 0.3, a: 0.01, rel: 0.9, vol: 0.08, pan: o.pan || 0 }));
+  },
+  redLight(t) { tone({ type: 'square', freq: 220, t, a: 0.005, hold: 0.25, rel: 0.05, vol: 0.12 }); tone({ type: 'square', freq: 233, t, a: 0.005, hold: 0.25, rel: 0.05, vol: 0.08 }); },
+  greenLight(t) { tone({ type: 'sine', freq: 880, t, a: 0.005, rel: 0.12, vol: 0.14 }); tone({ type: 'sine', freq: 1175, t: t + 0.09, a: 0.005, rel: 0.2, vol: 0.14 }); },
+  caught(t) { [523, 415, 330].forEach((f, i) => tone({ type: 'triangle', freq: f, t: t + i * 0.12, a: 0.005, rel: 0.15, vol: 0.18 })); },
   giggle(t, o = {}) {
     // cute "hi-hi-hi-hii~"
     const pan = o.pan || 0, v = o.vol ?? 1;
@@ -543,7 +593,17 @@ export const ambient = {
     hbGain.gain.value = 0.15;
     hbGain.connect(bus);
 
-    amb = { bus, lp, highG, hbGain, oscs, tension: 0, nextBeat: t + 0.5, nextCreak: t + 6, timer: setInterval(tickAmbient, 100) };
+    // rain (Night 3): a hiss + a patter band, silent until setRain()
+    const rain = ctx.createBufferSource();
+    rain.buffer = noiseBuf; rain.loop = true; rain.playbackRate.value = 0.9;
+    const rf1 = ctx.createBiquadFilter(); rf1.type = 'highpass'; rf1.frequency.value = 1800;
+    const rf2 = ctx.createBiquadFilter(); rf2.type = 'lowpass'; rf2.frequency.value = 7000;
+    const rainG = ctx.createGain(); rainG.gain.value = 0;
+    rain.connect(rf1).connect(rf2).connect(rainG).connect(bus);
+    rain.start(t);
+    oscs.push(rain);
+
+    amb = { bus, lp, highG, hbGain, rainG, rain: 0, muffle: 0, oscs, tension: 0, nextBeat: t + 0.5, nextCreak: t + 6, timer: setInterval(tickAmbient, 100) };
     ambient.setTension(0);
   },
   stop() {
@@ -557,6 +617,12 @@ export const ambient = {
     a.bus.gain.exponentialRampToValueAtTime(0.0001, t + 1);
     for (const o of a.oscs) { try { o.stop(t + 1.1); } catch {} }
     setTimeout(() => a.bus.disconnect(), 1300);
+  },
+  /** Rain outside, 0..1 (muffled: 0..1, e.g. inside a closed room). */
+  setRain(v, muffle = 0) {
+    if (!amb) return;
+    amb.rain = Math.max(0, Math.min(1, v));
+    amb.rainG.gain.setTargetAtTime(amb.rain * 0.09 * (1 - 0.7 * muffle), ctx.currentTime, 0.8);
   },
   setTension(v) {
     if (!amb) return;
@@ -580,6 +646,10 @@ const VOICES = {
   peachiBroken: { base: 520, spread: 0.45, dur: 0.07, gap: 0.02, type: 'triangle', formant: 1500, q: 2.5, vol: 0.18, vib: 40, broken: 0.4 },
   // PeachiBot: modem beeps, perfectly on grid
   bot: { base: 880, spread: 0.6, dur: 0.045, gap: 0.03, type: 'square', formant: 2400, q: 0.8, vol: 0.07, vib: 0, steps: [1, 1.5, 2, 1.25, 0.75] },
+  // the fake Peachi: her voice, but running backward (every syllable slides the wrong way)
+  fake: { base: 540, spread: 0.3, dur: 0.07, gap: 0.01, type: 'triangle', formant: 1700, q: 2, vol: 0.18, vib: 8, reverse: true },
+  // Phi Pop: low, groaning, chewing between words
+  pop: { base: 150, spread: 0.35, dur: 0.1, gap: 0.03, type: 'sawtooth', formant: 600, q: 2.5, vol: 0.12, vib: 10 },
   // Krasue: high, nasal, a bit too pleased with herself
   krasue: { base: 760, spread: 0.55, dur: 0.055, gap: 0.012, type: 'square', formant: 2900, q: 2.2, vol: 0.07, vib: 28 },
   // "เธอ" and other whispers: breathy, no pitch
@@ -631,7 +701,8 @@ export const voice = {
         const fl = ctx.createBiquadFilter();
         fl.type = 'peaking'; fl.frequency.value = V.formant * (0.8 + h * 0.5); fl.Q.value = V.q; fl.gain.value = 9;
         fl.connect(out(bus, pan));
-        tone({ type: V.type, freq: [f * 1.06, f * (last && ask ? 1.18 : 0.96)], t, a: 0.006, hold: dur * 0.45, rel: dur * 0.55, vol: V.vol, vib: V.vib, vibRate: 18, dest: fl });
+        const glide = V.reverse ? [f * 0.8, f * 1.2] : [f * 1.06, f * (last && ask ? 1.18 : 0.96)];
+        tone({ type: V.type, freq: glide, t, a: V.reverse ? dur * 0.7 : 0.006, hold: V.reverse ? 0 : dur * 0.45, rel: V.reverse ? dur * 0.12 : dur * 0.55, vol: V.vol, vib: V.vib, vibRate: 18, dest: fl });
         tone({ type: 'sine', freq: f * 2, t, a: 0.006, rel: dur * 0.5, vol: V.vol * 0.25, dest: fl });
         if (!V.steps) noise({ t, a: 0.001, rel: 0.014, vol: V.vol * 0.35, filter: 'highpass', f: 4200, pan, dest: bus }); // consonant tick
       }

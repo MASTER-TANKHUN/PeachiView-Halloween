@@ -16,6 +16,7 @@ export class Doors {
     this.level = level;
     this.player = player;
     this.locked = new Set();
+    this.broken = new Set();  // smashed open by Phi Pop: they don't close any more
     this.handles = [];
     this.onFront = null;      // () => void: the front door was used (resign joke)
     this.onKeyhole = null;    // (id) => void
@@ -33,6 +34,7 @@ export class Doors {
         radius: 1.35,
         label: () => {
           if (d.id === 'front' && this.onFront) return this.frontLabel;
+          if (this.broken.has(d.id)) return '[E] ประตูพังแล้ว';
           if (this.locked.has(d.id)) return this.lockedLabel;
           return level.doorOpen(d.id) ? '[E] ปิดประตู' : '[E] เปิดประตู';
         },
@@ -60,6 +62,7 @@ export class Doors {
     const d = level.doors[id];
     if (!d) return;
     if (id === 'front' && this.onFront) { this.onFront(); return; }
+    if (this.broken.has(id)) { sfx.play('creak', { len: 0.3, vol: 0.4 }); UI.toast('ประตูพังแล้ว… ปิดไม่ได้'); return; }
     if (this.locked.has(id)) {
       sfx.play('locked');
       if (this.onKeyhole) this.onKeyhole(id); else UI.toast('ประตูล็อกอยู่');
@@ -84,6 +87,25 @@ export class Doors {
     if (!d) return;
     this.level.setDoor(id, true);
     if (!silent) { const p = panFor(this.player, d.center.x, d.center.z); sfx.play('creak', { pan: p.pan, vol: p.vol, len: 1.3 }); }
+  }
+
+  /** One blow on a closed door (sound + rattle). */
+  bash(id) {
+    const d = this.level.doors[id];
+    if (!d) return;
+    this.level.shakeDoor(id);
+    const p = panFor(this.player, d.center.x, d.center.z);
+    sfx.play('bash', { pan: p.pan, vol: Math.min(1, p.vol * 1.4) });
+  }
+  /** Smash it open for good. */
+  smash(id) {
+    const d = this.level.doors[id];
+    if (!d) return;
+    this.broken.add(id);
+    this.locked.delete(id);
+    this.level.setDoor(id, true, { slam: true });
+    const p = panFor(this.player, d.center.x, d.center.z);
+    sfx.play('doorBreak', { pan: p.pan });
   }
 
   flip(room) {

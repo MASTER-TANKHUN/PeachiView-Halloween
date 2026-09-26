@@ -20,6 +20,7 @@ import { Krasue } from '../ghosts/krasue.js';
 import { Memes } from '../systems/memes.js';
 import { Night1 } from '../nights/night1.js';
 import { Night2 } from '../nights/night2.js';
+import { Night3 } from '../nights/night3.js';
 import { Prologue } from '../nights/prologue.js';
 import { NIGHT_DM } from '../data/story.js';
 
@@ -49,7 +50,7 @@ export class Director {
       scene, camera, renderer, level, player, peachi, cut: this.cut, doors: this.doors, hide: this.hide, requests: this.requests,
       phone: this.phone, power: this.power, anomalies: this.anomalies, krasue: this.krasue, memes: this.memes, params,
     };
-    this.nights = { 1: new Night1(ctx), 2: new Night2(ctx) };
+    this.nights = { 1: new Night1(ctx), 2: new Night2(ctx), 3: new Night3(ctx) };
     this.maxNight = Math.max(...Object.keys(this.nights).map(Number));
     this.night = this.nights[1];
     this.prologue = new Prologue(ctx);

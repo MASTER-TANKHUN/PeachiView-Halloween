@@ -3,8 +3,8 @@
 import { UI } from '../ui.js';
 import { voice } from '../audio.js';
 
-const NAMES = { peachi: 'พีชชี่', bot: 'PeachiBot', her: 'เธอ', me: 'มอด (คุณ)', krasue: 'กระสือ_Official' };
-const VOICE = { peachi: 'peachi', bot: 'bot', her: 'whisper', krasue: 'krasue' };
+const NAMES = { peachi: 'พีชชี่', fake: 'พีชชี่', bot: 'PeachiBot', her: 'เธอ', me: 'มอด (คุณ)', krasue: 'กระสือ_Official', pop: 'ผีปอบ' };
+const VOICE = { peachi: 'peachi', fake: 'fake', bot: 'bot', her: 'whisper', krasue: 'krasue', pop: 'pop' };
 const NOISE = ['▒', '░', '▓', '_', '…'];
 
 /** Break a line like a dropping stream: some clusters turn into noise, some stutter. Stays mostly readable. */
@@ -38,7 +38,7 @@ export const Talk = {
     const broken = who === 'peachi' && this.brokenPeachi && !opts.clean;
     const shown = broken ? garble(text) : text;
     const ms = opts.ms ?? Math.max(2200, 1300 + Array.from(text).length * 60);
-    const cls = [who, broken ? 'broken' : ''].filter(Boolean).join(' ');
+    const cls = [who === 'fake' ? 'peachi' : who, broken ? 'broken' : ''].filter(Boolean).join(' ');
     UI.subtitle(shown, ms, { name: NAMES[who] ?? who, cls });
     let pan = 0, vol = 1;
     if (opts.at && this.listener) {

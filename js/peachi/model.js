@@ -773,6 +773,9 @@ export function buildPeachi({ ghost = true } = {}) {
     setGlow(v) { glow = THREE.MathUtils.clamp(v, 0, 1); U.uGlow.value = glow; },
     /** 0..1: fade her to a pitch-black silhouette */
     setDark(v) { U.uDark.value = THREE.MathUtils.clamp(v, 0, 1); },
+    /** Rim-glow color of the ghost treatment. */
+    setGlowColor(hex) { U.uGlowColor.value.set(hex); },
+    get dark() { return U.uDark.value; },
     /** 0..1: drain her colors toward a cold ghost-grey (she gets them back after Night 2) */
     setDesat(v) { U.uDesat.value = THREE.MathUtils.clamp(v, 0, 1); },
     /** Show / hide the cat-ear headphones on her head. */

@@ -43,12 +43,17 @@ export class Requests {
     this.player = player; this.peachi = peachi; this.level = level; this.doors = doors;
     this.handles = [];
     this.onResult = () => {};   // (kind, ok)
+    // Night 3: the rack is a shared, limited supply (Phi Pop eats from it too)
+    this.freeSnacks = false;          // the rack works even without a "hungry" request
+    this.takeSnack = () => true;      // () => bool: take one from the supply (false = none left)
     this.reset();
   }
 
   reset() {
     this.active = null;
     this.snack = null;
+    this.freeSnacks = false;
+    this.takeSnack = () => true;
     this.done = 0;
     this.eyeCooldown = 0;
     UI.setRequest(null);
@@ -60,8 +65,11 @@ export class Requests {
     this.handles.push(player.addInteractable({
       position: new THREE.Vector3(0.9, 0.9, 1.62), radius: 1.35,
       label: () => (this.snack ? `[E] เปลี่ยนขนม (ถือ ${this.snack.name} อยู่)` : '[E] หยิบขนม'),
-      onUse: () => { this.snack = pick(SNACKS.filter((s) => s !== this.snack)); sfx.play('pickup'); UI.toast(`ได้ "${this.snack.name}" มา`); },
-      enabled: () => !!this.active && this.active.kind === 'hungry',
+      onUse: () => {
+        if (!this.snack && !this.takeSnack()) { sfx.play('denied'); UI.toast('ขนมหมดชั้นแล้ว…'); return; }
+        this.snack = pick(SNACKS.filter((s) => s !== this.snack)); sfx.play('pickup'); UI.toast(`ได้ "${this.snack.name}" มา`);
+      },
+      enabled: () => this.freeSnacks || (!!this.active && this.active.kind === 'hungry'),
     }));
     const at = new THREE.Vector3();
     this.handles.push(player.addInteractable({

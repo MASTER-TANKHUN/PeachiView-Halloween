@@ -112,7 +112,7 @@ export class Power {
       position: new THREE.Vector3(BREAKER.x, 1.3, BREAKER.z + 0.25), radius: 1.5,
       label: '[E] ซ่อมเบรกเกอร์',
       onUse: () => this.open(),
-      enabled: () => !this.on && !this.q && this.cool <= 0,
+      enabled: () => !this.on && !this.q && this.cool <= 0 && this.level.roomAt(this.player.position) === 'kitchen', // not through the hall wall
     });
   }
 

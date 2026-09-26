@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { sfx } from '../audio.js';
 import { panFor } from '../systems/doors.js';
+import { roomsLinked, nearestRoom, planRooms, pathLength, buildRoute } from './nav.js';
 
 const TAU = Math.PI * 2;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -20,22 +21,7 @@ const LICK_RANGE = 0.85;
 // the kitchen window she uses (south wall, x -6.9)
 export const WINDOW_IN = V(-6.9, 1.7, 6.1), WINDOW_OUT = V(-6.9, 1.9, 10.5);
 
-// doorways between rooms: door id (null = open arch), a point on each side
-const LINKS = [
-  { a: 'stream', b: 'hallway', door: 'stream', pa: V(-4, 0, -1.7), pb: V(-4, 0, -0.35) },
-  { a: 'bedroom', b: 'hallway', door: 'bedroom', pa: V(1.5, 0, -1.7), pb: V(1.5, 0, -0.35) },
-  { a: 'bathroom', b: 'hallway', door: 'bathroom', pa: V(6.8, 0, -1.7), pb: V(6.8, 0, -0.35) },
-  { a: 'kitchen', b: 'hallway', door: 'kitchen', pa: V(-3, 0, 1.7), pb: V(-3, 0, 0.35) },
-  { a: 'living', b: 'hallway', door: null, pa: V(6.5, 0, 1.7), pb: V(6.5, 0, 0.35) },
-  { a: 'kitchen', b: 'living', door: null, pa: V(2.3, 0, 4.5), pb: V(3.7, 0, 4.5) },
-];
-
-/** Can you see from room a into room b? (same room, or one open doorway between them) */
-export function roomsLinked(level, a, b) {
-  if (!a || !b) return false;
-  if (a === b) return true;
-  return LINKS.some((L) => ((L.a === a && L.b === b) || (L.a === b && L.b === a)) && (!L.door || level.doorOpen(L.door)));
-}
+export { roomsLinked };
 
 // ---------------------------------------------------------------- textures
 function faceTexture(expr) {
@@ -294,6 +280,7 @@ export class Krasue {
     this.awayT = 0;
     this.strong = false;
     this.frenzy = false;
+    this.avoid = null; // Set of rooms she won't enter (Night 3's safe room)
     this.expr = null;
     this._setExpr('smile');
     this._snapChains();
@@ -501,16 +488,7 @@ export class Krasue {
     return V(Math.min(r.x1 - 0.6, Math.max(r.x0 + 0.6, base.x + rand(-1.2, 1.2))), 0, Math.min(r.z1 - 0.6, Math.max(r.z0 + 0.6, base.z + rand(-1, 1))));
   }
 
-  _nearestRoom() {
-    let best = 'kitchen', bd = Infinity;
-    for (const k in this.level.rooms) {
-      const r = this.level.rooms[k];
-      const dx = Math.max(r.x0 - this.position.x, 0, this.position.x - r.x1), dz = Math.max(r.z0 - this.position.z, 0, this.position.z - r.z1);
-      const d = dx + dz;
-      if (d < bd) { bd = d; best = k; }
-    }
-    return best;
-  }
+  _nearestRoom() { return nearestRoom(this.level, this.position); }
 
   _farRoom(player) {
     let best = null, bd = -1;
@@ -525,49 +503,15 @@ export class Krasue {
   }
 
   _open(link) { return !link.door || this.level.doorOpen(link.door); }
+  _pass() { return this._passFn || (this._passFn = (L) => this._open(L)); }
 
-  /** Rooms → list of [link, fromSide] hops through open doorways, or null. */
-  _plan(from, to) {
-    if (!from || !to) return null;
-    if (from === to) return [];
-    const prev = { [from]: null }, q = [from];
-    while (q.length) {
-      const r = q.shift();
-      for (const L of LINKS) {
-        if (!this._open(L)) continue;
-        const next = L.a === r ? L.b : L.b === r ? L.a : null;
-        if (!next || next in prev) continue;
-        prev[next] = { L, from: r };
-        if (next === to) {
-          const hops = [];
-          let cur = to;
-          while (prev[cur]) { hops.unshift(prev[cur]); cur = prev[cur].from; }
-          return hops;
-        }
-        q.push(next);
-      }
-    }
-    return null;
-  }
-
-  _pathLen(hops, dest) {
-    let len = 0; _v.copy(this.position); _v.y = 0;
-    for (const h of hops) { const a = h.L.a === h.from ? h.L.pa : h.L.pb, b = h.L.a === h.from ? h.L.pb : h.L.pa; len += _v.distanceTo(a) + a.distanceTo(b); _v.copy(b); }
-    return len + Math.hypot(dest.x - _v.x, dest.z - _v.z);
-  }
-
+  /** Rooms → hops through open doorways (never into `avoid` rooms), or null. */
+  _plan(from, to) { return planRooms(from, to, this._pass(), this.avoid); }
+  _pathLen(hops, dest) { return pathLength(this.position, hops, dest); }
   _routeTo(dest, destRoom) {
-    const my = this.room || this._nearestRoom();
-    const hops = this._plan(my, destRoom || this.level.roomAt(dest) || my);
-    if (!hops) { this.route = []; return false; }
-    const r = [];
-    for (const h of hops) {
-      const a = h.L.a === h.from ? h.L.pa : h.L.pb, b = h.L.a === h.from ? h.L.pb : h.L.pa;
-      r.push({ p: a.clone(), cross: false, link: h.L }, { p: b.clone(), cross: true, link: h.L });
-    }
-    r.push({ p: V(dest.x, 0, dest.z), cross: false });
-    this.route = r;
-    return true;
+    const r = buildRoute(this.level, this.position, dest, destRoom || this.level.roomAt(dest), this._pass(), this.avoid);
+    this.route = r || [];
+    return !!r;
   }
 
   _move(dt) {

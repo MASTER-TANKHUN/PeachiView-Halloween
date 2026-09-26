@@ -140,7 +140,7 @@ function buildCredits(parent) {
   el('div', 'cby-name', by, 'Master Tankhun');
   el('div', 'cby-sub', by, 'Master Tankhun | Tankhun Gaming');
   sec('ตัวละคร', ['PeachiView  —  youtube.com/@PeachiView249']);
-  sec('เกมนี้', ['แฟนเกมที่ทำขึ้นเพื่อฉลองฮาโลวีน ไม่ใช่ผลงานทางการของช่อง', 'โมเดล ฉาก และเสียงทั้งหมดสร้างด้วยโค้ด']);
+  sec('เกมนี้', ['แฟนเกมที่ทำขึ้นเพื่อฉลองฮาโลวีน ไม่ใช่ผลงานทางการของช่อง', 'โมเดล ฉาก และเสียงทั้งหมดสร้างด้วยโค้ด', 'รูปลับพีชชี่ในบ้าน: รูปที่แจกให้แฟนใช้ฟรี']);
   sec('เครื่องมือ', ['three.js', 'ฟอนต์ Kanit, Mitr และ Sriracha (SIL Open Font License)', 'เสียงสังเคราะห์ด้วย Web Audio']);
   sec('ขอบคุณ', ['ลูกพีชน้อยทุกคน', 'มอดทุกคนที่ทำงานฟรี']);
   el('p', 'pnote', parent, 'แฟนเกมไม่เป็นทางการ ภาพลักษณ์ตัวละครเป็นของ PeachiView');
@@ -294,6 +294,10 @@ function buildHud(parent) {
   const mt = el('div', 'mood-txt', mood);
   el('div', 'mood-name', mt, 'พีชชี่');
   E.moodLabel = el('div', 'mood-label', mt, MOODS.happy.label);
+  E.hunger = el('div', 'hunger', tl);
+  el('span', null, E.hunger, 'ผีปอบหิว');
+  const hb = el('div', 'hunger-bar', E.hunger);
+  E.hungerFill = el('div', 'hunger-fill', hb);
   // top-center: objective + toasts
   const tc = el('div', 'hud-tc', hud);
   E.objective = el('div', 'objective', tc);
@@ -342,6 +346,7 @@ function buildHud(parent) {
   const scr = meter('scream', ICON.key, 'Space รัวๆ');
   E.scr = scr; E.scrFill = scr.fill; E.scrVal = scr.val; E.scrName = scr.nm; E.scrIcon = scr.ic; E.scream = scr.m;
   E.scrThresh = el('div', 'bar-thresh', scr.bar);
+  E.inv = el('div', 'inv', hud);
   // center
   el('div', 'crosshair', hud);
   E.prompt = el('div', 'prompt', hud);
@@ -568,6 +573,22 @@ export const UI = {
     E.reqBar.hidden = !(r.frac > 0);
   },
 
+  /** Phi Pop's hunger 0..100 under the mood (null hides it). */
+  setHunger(v) {
+    if (!root) return;
+    const on = v != null;
+    if (E.hunger.classList.contains('on') !== on) E.hunger.classList.toggle('on', on);
+    if (on) E.hungerFill.style.width = `${Math.round(Math.max(0, Math.min(100, v)))}%`;
+  },
+  /** What you carry: [{ icon, label }] (bottom right). */
+  setInventory(items) {
+    if (!root) return;
+    const key = (items || []).map((i) => i.icon + i.label).join('|');
+    if (E.inv._k === key) return;
+    E.inv._k = key;
+    E.inv.replaceChildren();
+    for (const it of items || []) { const d = el('div', 'inv-item', E.inv); el('b', null, d, it.icon); el('span', null, d, it.label); }
+  },
   /** [hour, minute] last shown on the HUD clock (the phone shows it too). */
   clockText() { return lastClock; },
 

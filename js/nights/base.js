@@ -96,6 +96,7 @@ export class NightBase {
     peachi.active = true;
     peachi.onCaught = () => this.lose(this.caughtReason);
 
+    this.doors.broken.clear();
     this.doors.attach();
     this.hide.attach();
     this.requests.attach();
@@ -181,13 +182,13 @@ export class NightBase {
   }
 
   /** The objective is done: play the night's ending scene, then the win card. */
-  async win() {
+  async win({ clear = true } = {}) {
     if (this.state !== 'play') return;
     this.state = 'cutscene';
     this._end();
     this.peachi.freeze();
     Save.addStats({ screams: this.stats.screams, bans: this.stats.bans, requests: this.stats.requests, nightsPlayed: 1 });
-    Save.clearNight(this.number);
+    if (clear) Save.clearNight(this.number);
     try { await this.winScene(); } catch (e) { console.error('[win scene]', e); }
     if (this.state !== 'cutscene') return; // aborted meanwhile
     this.state = 'won';
@@ -337,8 +338,8 @@ export class NightBase {
       this.idleUpdate(dt, t);
       return;
     }
-    const jumpscaring = peachi.state === 'jumpscare';
-    const hidden = this.hide.hidden;
+    const jumpscaring = peachi.state === 'jumpscare' || this.otherJumpscare();
+    const hidden = this.hide.hidden || this.inSafeRoom();
 
     // --- clock + script
     if (!jumpscaring) {
@@ -357,7 +358,7 @@ export class NightBase {
     // --- ghost
     peachi.update(dt, t, { player, camera, hour: this.hour, hidden });
     if (this.state !== 'play') return; // caught during this update
-    if (jumpscaring || peachi.state === 'jumpscare') return;
+    if (jumpscaring || peachi.state === 'jumpscare') { this.jumpscareUpdate(dt, t); return; }
 
     this._updateHiding(dt);
     if (this.state !== 'play' || peachi.state === 'jumpscare') return;
@@ -393,6 +394,12 @@ export class NightBase {
 
   /** Behind menus / during scenes. */
   idleUpdate() {}
+  /** A room ghosts won't enter (Night 3's Room of Waiting). */
+  inSafeRoom() { return false; }
+  /** Another ghost is doing its jumpscare (stop the clock and the rest). */
+  otherJumpscare() { return false; }
+  /** While a jumpscare plays: keep that ghost animating. */
+  jumpscareUpdate() {}
 
   _updateHiding(dt) {
     const { hide, peachi, player, camera } = this;

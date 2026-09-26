@@ -135,6 +135,16 @@ export function buildLevel(scene) {
     d.swing.rotation.y = d.sign * d.angle;
     d.collider.off = d.angle > 0.35;
   }
+  function shakeDoors(dt, t) { // a ghost pounding on a door: the leaf rattles in its frame
+    for (const d of doors) {
+      if (!(d.shake > 0)) continue;
+      d.shake = Math.max(0, d.shake - dt);
+      d.swing.rotation.y = d.sign * (d.angle + Math.sin(t * 70) * 0.045 * (d.shake / 0.35) + 0.02 * (d.shake / 0.35));
+    }
+  }
+  // lightning: the moon flares through the windows for a moment
+  let flashT = 0;
+  const moonBase = moon.intensity;
 
   // ---------------- room lights on switches (candles, screens and the TV stay as they are)
   const SWITCHED = new Set(['room', 'bulb', 'lamp', 'flicker', 'rgb']);
@@ -182,6 +192,8 @@ export function buildLevel(scene) {
   const emitF = M.emitFlicker, emitRGB = M.emitRGB;
   function update(dt, t) {
     for (const d of doors) moveDoor(d, dt);
+    shakeDoors(dt, t);
+    if (flashT > 0) { flashT = Math.max(0, flashT - dt); moon.intensity = moonBase * (1 + 5 * flashT * (0.6 + 0.4 * Math.sin(t * 90))); } else if (moon.intensity !== moonBase) moon.intensity = moonBase;
     const hue = 0.86 + 0.07 * Math.sin(t * 0.9);
     emitRGB.color.setHSL(hue, 0.9, 0.62);
     if (rgbLight) rgbLight.color.setHSL(hue, 0.85, 0.6);
@@ -220,6 +232,10 @@ export function buildLevel(scene) {
       if (instant) { d.angle = target; d.target = null; d.swing.rotation.y = d.sign * target; d.collider.off = target > 0.35; moon.shadow.needsUpdate = true; return; }
       d.target = target; d.slam = slam;
     },
+    /** Rattle a door (something is hitting it). */
+    shakeDoor(id, sec = 0.35) { const d = doorById[id]; if (d) d.shake = sec; },
+    /** Lightning flash through the windows. */
+    lightning(sec = 0.35) { flashT = Math.max(flashT, sec); },
     doorOpen(id) { const d = doorById[id]; return !!d && (d.target != null ? d.target > 0 : d.angle > 0.35); },
     switches: SWITCHES,
     setRoomLights(room, on) { const r = setRoomLights(room, on); syncSwitches(); return r; },

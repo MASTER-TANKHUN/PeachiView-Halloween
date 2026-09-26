@@ -1,5 +1,5 @@
-// Secret pictures: funny shots of Peachi's new 3D model (made by Master Tankhun in Blender), hidden around
-// the house as an easter egg. A cork board of photo cards on the stream room's south wall (behind you as
+// Secret pictures: funny Peachi pictures (shared free for fans to use), hidden around the house as an
+// easter egg. A cork board of photo cards on the stream room's south wall (behind you as
 // you walk in), a gold-framed "masterpiece" above the living-room TV, and a photo stuck on the fridge.
 // Press E on one to see it big with its caption; each one found is remembered (Save.memes).
 import * as THREE from 'three';
@@ -94,11 +94,12 @@ export class Memes {
   /** Interactables for the night (removed with it). */
   attach(night) {
     const spots = [
-      { at: new THREE.Vector3(BOARD_AT.x, 1.35, BOARD_AT.z - 0.3), r: 1.9, label: '[E] ดูรูปบนบอร์ด', ids: BOARD },
-      { at: new THREE.Vector3(FRAME_AT.x - 0.4, 1.7, FRAME_AT.z), r: 2.2, label: '[E] ดูภาพในกรอบทอง', ids: ['dank'] },
-      { at: new THREE.Vector3(FRIDGE_AT.x, 1.3, FRIDGE_AT.z - 0.25), r: 1.5, label: '[E] ดูรูปบนตู้เย็น', ids: ['surprised'] },
+      { at: new THREE.Vector3(BOARD_AT.x, 1.35, BOARD_AT.z - 0.3), r: 1.9, label: '[E] ดูรูปบนบอร์ด', ids: BOARD, room: 'stream' },
+      { at: new THREE.Vector3(FRAME_AT.x - 0.4, 1.7, FRAME_AT.z), r: 2.2, label: '[E] ดูภาพในกรอบทอง', ids: ['dank'], room: 'living' },
+      { at: new THREE.Vector3(FRIDGE_AT.x, 1.3, FRIDGE_AT.z - 0.25), r: 1.5, label: '[E] ดูรูปบนตู้เย็น', ids: ['surprised'], room: 'kitchen' },
     ];
-    for (const s of spots) night.interact({ position: s.at, radius: s.r, label: () => (this.open ? '[E] เก็บรูป' : s.label), onUse: () => this.show(s.ids), enabled: () => night.state === 'play' });
+    const here = () => night.level.roomAt(night.player.position);
+    for (const s of spots) night.interact({ position: s.at, radius: s.r, label: () => (this.open ? '[E] เก็บรูป' : s.label), onUse: () => this.show(s.ids), enabled: () => night.state === 'play' && here() === s.room });
   }
 
   show(ids) {
@@ -136,7 +137,7 @@ export class Memes {
     this.card.className = 'meme-cards';
     const note = document.createElement('div');
     note.className = 'meme-note';
-    note.textContent = 'รูปจากโมเดล 3D ตัวใหม่ของพีชชี่ · กด E เก็บรูป';
+    note.textContent = 'รูปลับของพีชชี่ · กด E เก็บรูป';
     el.append(this.card, note);
     this.el = el;
     UI.mount(el);

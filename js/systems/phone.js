@@ -11,7 +11,7 @@ import { UI } from '../ui.js';
 import { sfx } from '../audio.js';
 import { Settings } from '../settings.js';
 import { KINDS, ROOM_NAMES, REPORT_ROOMS } from './anomalies.js';
-import { roomsLinked } from '../ghosts/krasue.js';
+import { roomsLinked } from '../ghosts/nav.js';
 
 const TABS = [['missions', 'ภารกิจ'], ['report', 'รายงาน'], ['map', 'แผนที่'], ['camera', 'กล้อง']];
 const MIN_FOV = 28;
