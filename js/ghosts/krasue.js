@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { sfx } from '../audio.js';
 import { panFor } from '../systems/doors.js';
 import { roomsLinked, nearestRoom, planRooms, pathLength, buildRoute } from './nav.js';
+import { DIFF } from '../game/difficulty.js';
 
 const TAU = Math.PI * 2;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -425,7 +426,7 @@ export class Krasue {
   _speed() {
     let s = this.state === 'wander' ? WANDER : this.state === 'enter' ? 1.3 : this.state === 'leave' || this.state === 'retreat' ? 2.6 : SPEED;
     if (this.state === 'hunt' || this.state === 'search') { if (this.strong) s *= 1.2; if (this.frenzy) s *= 1.3; }
-    return s;
+    return s * DIFF.speed;
   }
   get sight() { return SIGHT + (this.strong ? 3 : 0) + (this.frenzy ? 4 : 0); }
 

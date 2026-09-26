@@ -8,6 +8,10 @@ let limiter = null;
 let noiseBuf = null;
 let masterLevel = 0.5;
 let duck = 0;
+// streamer mode: the loudest stings play through a lowered master for a moment
+const LOUD = new Set(['jumpscare', 'sting', 'caught', 'doorSlam', 'lose', 'bang', 'thunder', 'doorBreak', 'cackle']);
+let loudCap = 1, capTimer = null, capped = false;
+function applyMaster(tc = 0.05) { if (master) master.gain.setTargetAtTime(masterLevel * (1 - duck) * (capped ? loudCap : 1), ctx.currentTime, tc); }
 
 function ensure() {
   if (ctx) {
@@ -490,18 +494,21 @@ export const sfx = {
     if (!ensure()) return;
     const r = recipes[name];
     if (!r) { console.warn('[sfx] unknown sound', name); return; }
+    if (loudCap < 1 && LOUD.has(name)) { capped = true; applyMaster(0.005); clearTimeout(capTimer); capTimer = setTimeout(() => { capped = false; applyMaster(0.3); }, 1800); }
     try { r(ctx.currentTime + 0.01, opts || {}); } catch (e) { console.warn('[sfx] failed', name, e); }
   },
   setMaster(v) {
     masterLevel = Math.max(0, Math.min(MASTER_CAP, Number(v) || 0));
-    if (master) master.gain.setTargetAtTime(masterLevel * (1 - duck), ctx.currentTime, 0.05);
+    applyMaster();
   },
+  /** Streamer mode: 1 = off, e.g. 0.4 = jumpscare-type sounds at 40%. */
+  setLoudCap(k) { loudCap = Math.max(0.1, Math.min(1, Number(k) || 1)); },
   /** Everything quieter, 0..1 (the boss's "muted for copyright" rings). */
   setDuck(k) {
     const v = Math.max(0, Math.min(0.9, Number(k) || 0));
     if (Math.abs(v - duck) < 0.02) return;
     duck = v;
-    if (master) master.gain.setTargetAtTime(masterLevel * (1 - duck), ctx.currentTime, 0.15);
+    applyMaster(0.15);
   },
   names: Object.keys(recipes),
 };

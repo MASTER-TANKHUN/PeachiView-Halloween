@@ -5,6 +5,7 @@ import { UI } from '../ui.js';
 import { sfx } from '../audio.js';
 import { peachiLines } from '../data/chat.js';
 import { Talk } from '../game/talk.js';
+import { DIFF } from '../game/difficulty.js';
 
 const pick = (arr) => (arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : null);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -161,7 +162,7 @@ export class PeachiGhost {
     if (!stunned) {
       if (mood === 'angry' && !hidden) {
         this.state = 'chase';
-        let speed = hour >= 4 ? 2.6 : 1.6;
+        let speed = (hour >= 4 ? 2.6 : 1.6) * DIFF.speed;
         if (this.mood >= 80) speed *= 1.3;
         this.lit = !!player.isLightOn(new THREE.Vector3(pos.x, 1.0, pos.z));
         if (this.lit) speed *= 0.5;
@@ -225,7 +226,7 @@ export class PeachiGhost {
     const dx = this.target.x - pos.x, dz = this.target.z - pos.z;
     const d = Math.hypot(dx, dz);
     if (d < 1e-4) return [0, 0];
-    const step = Math.min(d, 1.0 * dt);
+    const step = Math.min(d, DIFF.speed * dt);
     return [(dx / d) * step, (dz / d) * step];
   }
 

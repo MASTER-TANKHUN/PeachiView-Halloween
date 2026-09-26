@@ -7,6 +7,10 @@ const DEFAULTS = {
   quality: 'high',    // 'high' (bloom + shadows) | 'medium' (shadows, no bloom) | 'low' (neither)
   mic: true,          // ask for the mic to scream at ghosts (Space works either way)
   calm: false,        // fewer flashes / less screen shake
+  difficulty: 'normal', // 'easy' (ลูกพีชน้อย) | 'normal' | 'hard' (ตีสาม), see game/difficulty.js
+  streamer: false,    // streamer mode: jumpscare sounds capped, calmer flashes
+  autoRes: true,      // lower the render resolution by itself when the FPS drops
+  showFps: false,     // FPS counter in the corner
 };
 const listeners = new Set();
 let data = { ...DEFAULTS };

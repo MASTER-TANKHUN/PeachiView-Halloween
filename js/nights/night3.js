@@ -11,6 +11,8 @@ import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { NightBase, pick, rand, randInt } from './base.js';
 import { UI } from '../ui.js';
+import { Settings } from '../settings.js';
+const MIRROR_RES = () => (Settings.get().quality === 'low' ? 256 : 512);
 import { sfx, ambient } from '../audio.js';
 import { Talk } from '../game/talk.js';
 import { BOT, HER, KRASUE, STORIES } from '../data/story.js';
@@ -575,7 +577,7 @@ export class Night3 extends NightBase {
     }
   }
   _mirror(pos, w, h, ry) {
-    const m = new Reflector(new THREE.PlaneGeometry(w, h), { textureWidth: 512, textureHeight: 512, color: 0x9aa2ac, clipBias: 0.003 });
+    const m = new Reflector(new THREE.PlaneGeometry(w, h), { textureWidth: MIRROR_RES(), textureHeight: MIRROR_RES(), color: 0x9aa2ac, clipBias: 0.003 });
     m.position.copy(pos); m.rotation.y = ry;
     m.camera.layers.enable(3);
     const draw = m.onBeforeRender;

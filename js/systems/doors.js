@@ -35,7 +35,7 @@ export class Doors {
         label: () => {
           if (d.id === 'front' && this.onFront) return this.frontLabel;
           if (this.broken.has(d.id)) return '[E] ประตูพังแล้ว';
-          if (this.locked.has(d.id)) return this.lockedLabel;
+          if (this.locked.has(d.id)) return this.jailed === d.id ? '[E] ประตูล็อก (กุญแจอยู่ในโอ่ง)' : this.lockedLabel;
           return level.doorOpen(d.id) ? '[E] ปิดประตู' : '[E] เปิดประตู';
         },
         onUse: () => this.use(d.id),
@@ -65,7 +65,8 @@ export class Doors {
     if (this.broken.has(id)) { sfx.play('creak', { len: 0.3, vol: 0.4 }); UI.toast('ประตูพังแล้ว… ปิดไม่ได้'); return; }
     if (this.locked.has(id)) {
       sfx.play('locked');
-      if (this.onKeyhole) this.onKeyhole(id); else UI.toast('ประตูล็อกอยู่');
+      if (this.jailed === id) UI.toast('ล็อกจากข้างนอก! ล้วงหากุญแจในโอ่ง');
+      else if (this.onKeyhole) this.onKeyhole(id); else UI.toast('ประตูล็อกอยู่');
       return;
     }
     const open = !level.doorOpen(id);

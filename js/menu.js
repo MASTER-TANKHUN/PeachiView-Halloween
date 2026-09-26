@@ -10,6 +10,10 @@ import { FONT_SPECS } from './world/tex.js';
 import { Save } from './game/save.js';
 
 const TAU = Math.PI * 2;
+// the real date: 31 Oct = bunting + a greeting note; 1–7 Nov = "Halloween's over, Peachi's still live" (?date=YYYY-MM-DD to test)
+const TODAY = (() => { const q = new URLSearchParams(location.search).get('date'); const d = q ? new Date(`${q}T12:00:00`) : new Date(); return isNaN(d) ? new Date() : d; })();
+const IS_HALLOWEEN = TODAY.getMonth() === 9 && TODAY.getDate() === 31;
+const AFTER_HALLOWEEN = TODAY.getMonth() === 10 && TODAY.getDate() <= 7;
 const cleared = () => Save.data.nightsCleared.length;
 const ended = () => !!Save.data.endings.normal;
 const NOTES = [ // id, text, paper color, size, tilt, a little height jitter; `need`: only shown once it's true
@@ -20,6 +24,7 @@ const NOTES = [ // id, text, paper color, size, tilt, a little height jitter; `n
   { id: 'howto', text: 'วิธีเล่น', color: '#ffe57a', s: 0.24, tilt: -0.05, dy: -0.02, doodle: 'q' },
   { id: 'settings', text: 'ตั้งค่า', color: '#a6dcff', s: 0.24, tilt: 0.04, dy: 0.025, doodle: 'gear' },
   { id: 'credits', text: 'เครดิต', color: '#bdf2a8', s: 0.235, tilt: -0.08, dy: -0.035, doodle: 'heart' },
+  { id: 'halloween', text: 'สุขสันต์วันฮาโลวีน', color: '#ffa94d', s: 0.24, tilt: 0.06, dy: 0.01, doodle: 'star', need: () => IS_HALLOWEEN },
 ];
 const ROW_X = -5.7425, ROW_GAP = 0.305;
 /** The play note's text for this save. */
@@ -100,7 +105,7 @@ function drawTitleCard(g, w, h, t, glitch, done) {
   g.beginPath(); g.arc(0, 9, 5, 0, Math.PI); g.fill();
   g.restore();
   g.font = '400 20px Mitr, sans-serif'; g.textAlign = 'center'; g.fillStyle = `rgba(239,226,242,${0.55 + 0.35 * Math.sin(t * 3)})`;
-  g.fillText(done ? 'ขอบคุณที่อยู่ด้วยกันจนจบนะ ♡ แล้วเจอกันใหม่' : 'รอมอดมากดเริ่มไลฟ์...', w / 2, h - 30);
+  g.fillText(AFTER_HALLOWEEN ? 'ฮาโลวีนผ่านไปแล้ว… แต่พีชชี่ยังไลฟ์อยู่นะ' : done ? 'ขอบคุณที่อยู่ด้วยกันจนจบนะ ♡ แล้วเจอกันใหม่' : IS_HALLOWEEN ? '🎃 คืนนี้คืนฮาโลวีน! รอมอดอยู่นะ' : 'รอมอดมากดเริ่มไลฟ์...', w / 2, h - 30);
   g.fillStyle = 'rgba(0,0,0,0.13)'; for (let y = 0; y < h; y += 3) g.fillRect(0, y, w, 1); // scanlines
   if (glitch > 0) { // static burst when she shows up
     const img = g.getImageData(0, 0, w, h), d = img.data;
@@ -109,10 +114,32 @@ function drawTitleCard(g, w, h, t, glitch, done) {
   }
 }
 
+/** 31 Oct: a "HAPPY HALLOWEEN" flag garland over the neon sign. */
+function buildBunting() {
+  const g = new THREE.Group();
+  const letters = 'HAPPY HALLOWEEN'.split('');
+  const a = new THREE.Vector3(-7.75, 2.62, WALL_Z + 0.04), b = new THREE.Vector3(-5.35, 2.56, WALL_Z + 0.04); // just above the neon sign's board
+  const cols = ['#ff7a1a', '#2a1a30', '#9b5cff'];
+  letters.forEach((ch, i) => {
+    const u = (i + 0.5) / letters.length;
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d');
+    x.fillStyle = cols[i % 3]; x.beginPath(); x.moveTo(2, 2); x.lineTo(62, 2); x.lineTo(32, 62); x.closePath(); x.fill();
+    x.fillStyle = i % 3 === 1 ? '#ffb347' : '#fff'; x.font = 'bold 30px Kanit, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ch, 32, 22);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.13), new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide }));
+    m.position.lerpVectors(a, b, u); m.position.y -= Math.sin(u * Math.PI) * 0.015 + 0.07;
+    m.rotation.z = (u - 0.5) * 0.25;
+    if (ch !== ' ') g.add(m);
+  });
+  return g;
+}
+
 // ------------------------------------------------------------------ controller
 export function createMenuScene({ camera, level, peachi, sfx, UI }) {
   const root = new THREE.Group(); root.name = 'titleNotes';
   level.scene.add(root);
+  if (IS_HALLOWEEN) root.add(buildBunting());
   const notes = NOTES.map((n) => {
     const c = document.createElement('canvas'); c.width = 320; c.height = 320;
     const g = c.getContext('2d');

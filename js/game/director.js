@@ -18,6 +18,7 @@ import { Power } from '../systems/power.js';
 import { Anomalies } from '../systems/anomalies.js';
 import { Krasue } from '../ghosts/krasue.js';
 import { Memes } from '../systems/memes.js';
+import { Jail } from '../systems/jail.js';
 import { MiniGames } from '../systems/minigames.js';
 import { Ending } from './ending.js';
 import { Night1 } from '../nights/night1.js';
@@ -52,9 +53,10 @@ export class Director {
     this.memes = new Memes({ scene });
     this.games = new MiniGames({ scene, level, player, camera });
     this.ending = new Ending();
+    this.jail = new Jail({ scene, level, player, doors: this.doors });
     const ctx = {
       scene, camera, renderer, level, player, peachi, cut: this.cut, doors: this.doors, hide: this.hide, requests: this.requests,
-      phone: this.phone, power: this.power, anomalies: this.anomalies, krasue: this.krasue, memes: this.memes, games: this.games, params,
+      phone: this.phone, power: this.power, anomalies: this.anomalies, krasue: this.krasue, memes: this.memes, games: this.games, jail: this.jail, params,
     };
     this.nights = { 1: new Night1(ctx), 2: new Night2(ctx), 3: new Night3(ctx) };
     this.maxNight = Math.max(...Object.keys(this.nights).map(Number));

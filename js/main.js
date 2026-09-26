@@ -78,6 +78,23 @@ const game = { director, peachi, player, level, scene, camera, renderer, UI, Scr
   get state() { return director.state; }, get night() { return director.night; }, get paused() { return director.paused; } };
 window.__game = game;
 
+// ---------------------------------------------------------------- performance: FPS meter + auto resolution
+// Below ~40 FPS for 3 s the render scale steps down (to 60% at most); above ~56 FPS for 10 s it steps back.
+let renderScale = 1, fpsEma = 60, lowT = 0, highT = 0, fpsShowT = 0;
+const fpsEl = document.createElement('div');
+fpsEl.className = 'fps-meter tnum'; fpsEl.hidden = true;
+document.body.appendChild(fpsEl);
+function watchFps(rawDt) {
+  const dt = Math.min(Math.max(rawDt, 1e-3), 0.25); // a hidden tab comes back with one huge frame
+  fpsEma += (1 / dt - fpsEma) * 0.05;
+  const s = Settings.get();
+  if ((fpsShowT -= dt) <= 0 && s.showFps) { fpsShowT = 0.5; fpsEl.textContent = `${Math.round(fpsEma)} FPS${renderScale < 1 ? ` · ${Math.round(renderScale * 100)}%` : ''}`; }
+  if (!s.autoRes) return;
+  if (fpsEma < 40) { lowT += dt; highT = 0; } else if (fpsEma > 56) { highT += dt; lowT = 0; } else { lowT = 0; highT = 0; }
+  const step = lowT > 3 && renderScale > 0.6 ? -0.15 : highT > 10 && renderScale < 1 ? 0.15 : 0;
+  if (step) { renderScale = Math.min(1, Math.max(0.6, renderScale + step)); lowT = 0; highT = 0; applySettings(s); }
+}
+
 // ---------------------------------------------------------------- settings
 function recompileAll() { scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); }); }
 function applySettings(s) {
@@ -86,7 +103,10 @@ function applySettings(s) {
   if (camera.fov !== s.fov) { camera.fov = s.fov; camera.updateProjectionMatrix(); }
   const shadows = s.quality !== 'low';
   const wantPost = !!post && s.quality !== 'low';
-  const ratio = s.quality === 'high' ? DPR : 1;
+  sfx.setLoudCap(s.streamer ? 0.4 : 1);
+  if (fpsEl) fpsEl.hidden = !s.showFps;
+  if (!s.autoRes) renderScale = 1;
+  const ratio = (s.quality === 'high' ? DPR : 1) * renderScale;
   let recompile = false;
   if (renderer.shadowMap.enabled !== shadows) { renderer.shadowMap.enabled = shadows; recompile = true; if (shadows && level.moon) level.moon.shadow.needsUpdate = true; }
   const tm = wantPost ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
@@ -117,7 +137,9 @@ const reported = new Set();
 
 function frame() {
   requestAnimationFrame(frame);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const raw = clock.getDelta();
+  const dt = Math.min(raw, 0.05);
+  watchFps(raw);
   elapsed += dt;
   try {
     director.tick(dt, elapsed);

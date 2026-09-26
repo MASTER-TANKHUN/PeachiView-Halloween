@@ -10,6 +10,8 @@ import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { NightBase, pick, rand, randInt } from './base.js';
 import { UI } from '../ui.js';
+import { Settings } from '../settings.js';
+const MIRROR_RES = () => (Settings.get().quality === 'low' ? 256 : 512);
 import { sfx } from '../audio.js';
 import { Talk } from '../game/talk.js';
 import { BOT, HER, KRASUE, STORIES, LOSE } from '../data/story.js';
@@ -600,7 +602,7 @@ export class Night2 extends NightBase {
   // ---------------------------------------------------------------- 03:00 the bathroom mirror
   _mirrorSetup() {
     if (this.mirror) return this.mirror;
-    const m = new Reflector(new THREE.PlaneGeometry(0.6, 0.82), { textureWidth: 512, textureHeight: 512, color: 0x9098a0, clipBias: 0.003 });
+    const m = new Reflector(new THREE.PlaneGeometry(0.6, 0.82), { textureWidth: MIRROR_RES(), textureHeight: MIRROR_RES(), color: 0x9098a0, clipBias: 0.003 });
     m.position.copy(MIRROR);
     m.rotation.y = -Math.PI / 2;
     m.camera.layers.enable(3); // Peachi is on layer 3 while she's only in the mirror

@@ -10,6 +10,7 @@ import { Save } from '../game/save.js';
 import * as chatData from '../data/chat.js';
 import { BOT, LOSE } from '../data/story.js';
 import { Ach, Money, Shop } from '../game/meta.js';
+import { DIFF, TROLLS } from '../game/difficulty.js';
 
 const { normalChat, spamChat, superChats } = chatData;
 export const START_VIEWERS = 249;
@@ -144,12 +145,13 @@ export class NightBase {
   /** What the mod bought at ร้านลูกพีช (meta.js). */
   _useItems() {
     const { player } = this;
-    player.drainMul = Shop.use('battery') ? 0.6 : 1;
-    if (player.drainMul < 1) setTimeout(() => this.state === 'play' && UI.toast('ใส่ถ่านก้อนใหญ่แล้ว ไฟฉายอึดขึ้น 🔋'), 2500);
+    player.drainMul = (Shop.use('battery') ? 0.6 : 1) * DIFF.drain;
+    if (player.drainMul < 0.65) setTimeout(() => this.state === 'play' && UI.toast('ใส่ถ่านก้อนใหญ่แล้ว ไฟฉายอึดขึ้น 🔋'), 2500);
     this.requests.pocketSnack = () => Shop.use('peach');
     Scream.boost = Shop.has('mic') ? 1.5 : 1;
     if (this.phone && this.phone.setCase) this.phone.setCase(Shop.has('case') ? 'peach' : null);
     this.amuletUsed = false;
+    this.jailUsed = false;
   }
 
   /** Night over: pay the super chats (half if lost), count achievements, keep the best photo. */
@@ -200,6 +202,7 @@ export class NightBase {
   at(hour, fn) { this.events.push({ at: hour, fn, done: false }); }
 
   _end() {
+    if (this.jail) this.jail.stop();
     if (this.memes) this.memes.close();
     if (this.games) this.games.stop(true);
     if (this.poll) { if (this.poll.ui) this.poll.ui.close(-1); this.poll = null; }
@@ -217,7 +220,19 @@ export class NightBase {
 
   lose(reason) {
     if (this.state !== 'play') return;
-    if (this.god && reason !== 'resign') { this.peachi.reset(pick(this.level.ghostSpawns)); this.peachi.active = true; this.player.enabled = true; UI.toast('[god] รอด'); return; }
+    if (this.god && reason !== 'resign' && reason !== 'timeout') { this.peachi.reset(pick(this.level.ghostSpawns)); this.peachi.active = true; this.player.enabled = true; UI.toast('[god] รอด'); return; }
+    if ((reason === 'caught' || reason === 'found') && DIFF.jail && !this.jailUsed && this.jail) { // ลูกพีชน้อย: bathroom jail
+      this.jailUsed = true;
+      const P = this.peachi;
+      this.hide.reset();
+      P.freeze(); P.group.visible = false;
+      this.chat(pick(HYPE_USERS), 'มอดติดคุกห้องน้ำ 555 รีบหากุญแจเร็ว!');
+      this.jail.start({
+        onFree: () => { if (this.state !== 'play') return; P.reset(pick(this.level.ghostSpawns.filter((s) => s.distanceTo(this.player.position) > 8)) || this.level.ghostSpawns[0]); P.active = true; P.mood = 30; },
+        onFail: () => { this.jailUsed = true; this.lose('jail'); },
+      });
+      return;
+    }
     if ((reason === 'caught' || reason === 'found') && !this.amuletUsed && Shop.use('amulet')) { // ยันต์กันผี
       this.amuletUsed = true;
       this.peachi.reset(pick(this.level.ghostSpawns)); this.peachi.active = true; this.player.enabled = true;
@@ -446,7 +461,7 @@ export class NightBase {
   requestAllowed() { return true; }
   requestsPaused() { return false; }
   _updateRequests(dt) {
-    if (this.reqTimer > 900) return;
+    if (this.reqTimer > 900 || (this.jail && this.jail.active)) return;
     this.reqTimer -= dt;
     if (this.reqTimer > 0) return;
     if (this.requests.active || this.peachi.isAngry || this.hide.hidden || (this.games && this.games.active) || this.requestsPaused()) { this.reqTimer = 3; return; }
@@ -566,6 +581,7 @@ export class NightBase {
     if (jumpscaring || peachi.state === 'jumpscare') { this.jumpscareUpdate(dt, t); return; }
 
     this._updateHiding(dt);
+    if (this.jail) this.jail.update(dt);
     if (this.state !== 'play' || peachi.state === 'jumpscare') return;
     this.requests.update(dt);
     this._updateRequests(dt);
@@ -646,12 +662,12 @@ export class NightBase {
     this.chatTimer -= dt;
     if (this.chatTimer <= 0) {
       this.chatTimer = rand(2, 4);
-      const m = pick(this.chatPool ? this.chatPool() : normalChat);
+      const m = DIFF.trolls && Math.random() < 0.45 ? pick(TROLLS) : pick(this.chatPool ? this.chatPool() : normalChat);
       if (m) this.chat(m.user, m.text);
     }
     this.spamTimer -= dt;
     if (this.spamTimer <= 0) {
-      this.spamTimer = this.hour >= 3 ? rand(3.5, 6) : rand(6, 10);
+      this.spamTimer = (this.hour >= 3 ? rand(3.5, 6) : rand(6, 10)) * DIFF.spam;
       const m = pick(spamChat);
       if (m) {
         this.chat(m.user, m.text, 'spam');

@@ -166,6 +166,12 @@ export function mountMetaPanels({ onPick }) {
     };
     draw();
   });
+  UI.addMenuPanel('halloween', 'สุขสันต์วันฮาโลวีน 🎃', (root) => {
+    root.replaceChildren();
+    el('p', 'ptext', root, 'Happy Halloween! ขอให้คืนฮาโลวีนนี้สนุกนะคะ ลูกพีชน้อยทุกคน');
+    el('p', 'ptext', root, 'คืนนี้คือคืนเดียวกับคืนที่ 3 ในเกม ลองเล่นให้จบในคืนนี้ดูสิ พีชชี่รออยู่');
+    el('div', 'cline', root, '— จาก พีชชี่ และ Master Tankhun');
+  });
   UI.addMenuPanel('album', 'อัลบั้ม', (root) => {
     root.replaceChildren();
     const got = ACH.filter((a) => Ach.has(a.id)).length;

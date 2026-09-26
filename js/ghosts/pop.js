@@ -10,6 +10,7 @@ import { UI } from '../ui.js';
 import { Talk } from '../game/talk.js';
 import { panFor } from '../systems/doors.js';
 import { nearestRoom, buildRoute, roomsLinked } from './nav.js';
+import { DIFF } from '../game/difficulty.js';
 
 const TAU = Math.PI * 2;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -369,7 +370,7 @@ export class PhiPop {
     const dx = w.p.x - pos.x, dz = w.p.z - pos.z, d = Math.hypot(dx, dz);
     const last = this.route.length === 1;
     if (d < (last ? 0.4 : 0.12)) { this.route.shift(); return; }
-    const step = Math.min(d, speed * dt);
+    const step = Math.min(d, speed * DIFF.speed * dt);
     pos.x += (dx / d) * step; pos.z += (dz / d) * step;
     const crossing = w.cross || noClamp;
     if (!crossing) {

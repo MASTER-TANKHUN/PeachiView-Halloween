@@ -126,6 +126,10 @@ function buildSettings(parent) {
   choice('คุณภาพภาพ', 'quality', [['high', 'สูง'], ['medium', 'กลาง'], ['low', 'ต่ำ']], 'ต่ำ = ปิดเงาและแสงฟุ้ง เหมาะกับเครื่องที่ไม่แรง');
   choice('กรี๊ดใส่ไมค์', 'mic', [[true, 'ใช้'], [false, 'ไม่ใช้']], 'ไม่ใช้ไมค์ก็กด Space รัวๆ แทนได้');
   choice('ลดแสงวาบและจอสั่น', 'calm', [[false, 'ปกติ'], [true, 'ลด']]);
+  choice('ความยาก', 'difficulty', [['easy', 'ลูกพีชน้อย'], ['normal', 'ปกติ'], ['hard', 'ตีสาม']], 'ลูกพีชน้อย: ผีช้าลง แบตอึด โดนจับครั้งแรกติดคุกห้องน้ำแทนแพ้ · ตีสาม: ผีเร็ว สแปมถี่ แชตมีแต่เกรียน');
+  choice('โหมดสตรีมเมอร์', 'streamer', [[false, 'ปิด'], [true, 'เปิด']], 'เสียงตุ้งแช่เบาลง แสงวาบน้อยลง (เสียงทั้งเกมแต่งเอง ไม่ติดลิขสิทธิ์)');
+  choice('ปรับความละเอียดอัตโนมัติ', 'autoRes', [[true, 'เปิด'], [false, 'ปิด']], 'ถ้า FPS ตก เกมจะลดความละเอียดให้เอง');
+  choice('แสดง FPS', 'showFps', [[false, 'ซ่อน'], [true, 'แสดง']]);
   return form;
 }
 function buildHowto(parent) {
@@ -864,7 +868,7 @@ export const UI = {
   },
 
   flash(color = '#fff') {
-    if (!root || Settings.get().calm) return;
+    if (!root || Settings.get().calm || Settings.get().streamer) return;
     E.flash.style.background = color;
     restartAnim(E.flash, 'go');
   },
@@ -872,7 +876,7 @@ export const UI = {
   shake(ms = 400) {
     const app = document.getElementById('app');
     if (!app) return;
-    if (Settings.get().calm) ms = Math.min(ms, 160);
+    if (Settings.get().calm || Settings.get().streamer) ms = Math.min(ms, 160);
     app.style.setProperty('--shake-ms', `${Math.max(50, ms)}ms`);
     restartAnim(app, 'pv-shake');
     clearTimeout(app._shakeT);

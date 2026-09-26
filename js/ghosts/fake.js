@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { buildPeachi } from '../peachi/model.js';
 import { sfx } from '../audio.js';
 import { UI } from '../ui.js';
+import { DIFF } from '../game/difficulty.js';
 import { Talk } from '../game/talk.js';
 import { panFor } from '../systems/doors.js';
 
@@ -142,7 +143,7 @@ export class FakePeachi {
     if (this.state === 'lunge') { this.model.update(dt, t); return; }
     if (want) {
       const wx = want.x - pos.x, wz = want.z - pos.z, wd = Math.hypot(wx, wz);
-      if (wd > 0.05) { const s = Math.min(wd, speed * dt); pos.x += (wx / wd) * s; pos.z += (wz / wd) * s; }
+      if (wd > 0.05) { const s = Math.min(wd, speed * DIFF.speed * dt); pos.x += (wx / wd) * s; pos.z += (wz / wd) * s; }
     }
     pos.y = 0;
     // face you, like she does
