@@ -119,6 +119,9 @@ js/game/director.js     title → DM (+ prologue the first time) → night card 
 js/game/save.js         localStorage 'peachi.save' (nights cleared, prologue seen, stats, achievements)
 js/game/cutscene.js     async scenes: camera moves, subtitles, waits; Enter skips
 js/game/talk.js         every spoken line: subtitle + babble voice (audio.js `voice`), Peachi's broken voice
+js/game/boss.js         PeachiBot, Night 3's boss at 05:00: spam flood → © claim (mute rings) → ban hammer; 3 strikes = channel deleted
+js/game/ending.js       the normal ending: dawn scene, wish, Happy Halloween card (PNG), credits
+js/game/meta.js         achievements (toast + album), money ฿, the shop ร้านลูกพีช, the title's night select / shop / album pages
 js/nights/base.js       shared night: clock + scripted events at(hour), viewers, chat, hiding + search, lose/win
 js/nights/night1.js     headphones, requests schedule, photo request 01:15, webcam scare 02:00, music hint 03:00, "เธอ" 04:00, ending
 js/nights/night2.js     Krasue, anomalies → golden peach, Wi-Fi joke, blackouts 02:00/04:00, hide-and-seek 02:30, mirror 03:00, ending

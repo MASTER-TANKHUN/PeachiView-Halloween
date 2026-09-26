@@ -12,3 +12,9 @@ Character_Sheet_1_Peachi.png
 # Peachi 3D sources (the site only needs assets/models/*.glb)
 *.blend
 peachi-3d.html
+
+# the user's uploads at the repo root (the game uses assets/memes/*.webp)
+Character_Sheet_1_Peachi.webp
+Screenshot_*.png
+Dankmeme_Peachi.png
+peachi-surprised.png
