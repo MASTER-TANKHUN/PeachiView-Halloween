@@ -65,6 +65,11 @@ def main():
     if want('head_acc'):
         from peachi import headphones
         headphones.build(ctx)
+        if not args.no_export:   # the same headphones on their own: Night 1's pickup item
+            from peachi import export
+            objs = [o for n, o in ctx['objects'].items() if n.startswith('Headphones_')]
+            export.export_item(objs, os.path.join(C.OUT_DIR, 'headphones.glb'),
+                               rename=lambda n: n.replace('Headphones_', 'Phones_'), log=log)
     if want('clothes'):
         from peachi import clothes
         clothes.build(ctx)

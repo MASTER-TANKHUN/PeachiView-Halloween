@@ -191,13 +191,14 @@ def clip_jumpscare(t, D=1.4):
     k = 0.0 if t < 0.18 else min(1.0, (t - 0.18) / 0.14)
     k = k * k * (3 - 2 * k)
     shake = 0.0 if t < 0.32 else 3.0 * S(TAU * t * 11)
-    p['_loc'] = (0.0, 0.03 * k_in * (1 - k) - 0.30 * k, -0.03 * k_in * (1 - k) + 0.10 * k)
-    p.rot('Hips', -6 * k_in * (1 - k) + 14 * k, 0, 0)
-    p.rot('Spine', 8 * k, 0, 0)
-    p.rot('Spine2', 10 * k, shake, 0)
-    p.rot('Head', 12 * k + shake, shake * 0.5, 0)
+    # the game lunges her at the camera itself (and frames her face), so the clip only leans in a little
+    p['_loc'] = (0.0, 0.03 * k_in * (1 - k) - 0.06 * k, -0.03 * k_in * (1 - k) + 0.05 * k)
+    p.rot('Hips', -6 * k_in * (1 - k) + 6 * k, 0, 0)
+    p.rot('Spine', 5 * k, 0, 0)
+    p.rot('Spine2', 5 * k, shake, 0)
+    p.rot('Head', 2 * k + shake, shake * 0.5, 0)
     for side, sg in (('Left', 1), ('Right', -1)):
-        p.rot(side + 'Arm', -20 * k_in * (1 - k) - 150 * k, sg * (-35 * k), 0)
+        p.rot(side + 'Arm', -20 * k_in * (1 - k) - 105 * k, sg * (-55 * k), 0)
         p.rot(side + 'ForeArm', -30 * k, 0, 0)
         p.rot(side + 'Hand', -35 * k, 0, 0)
         p.rot(side + 'UpLeg', -30 * k, sg * 6 * k, 0)
@@ -261,6 +262,27 @@ def clip_cheer(t, D=1.2):
     return p
 
 
+def clip_stunned(t, D=2.0):
+    """Dazed after the player's scream: knocked back, head circling, limp arms, still floating."""
+    w = TAU * t / D
+    p = Pose()
+    p['_loc'] = (0.012 * S(w), 0.025, 0.07 + 0.015 * S(2 * w))
+    p.rot('Hips', -6, 3 * S(w), 4 * S(w))
+    p.rot('Spine', -5, 0, 0)
+    p.rot('Spine2', -4 + 2 * S(2 * w), 0, 3 * S(w + 0.5))
+    p.rot('Neck', 4, 0, 0)
+    p.rot('Head', 6 + 7 * S(2 * w), 12 * C(2 * w), 8 * S(w))
+    for side, sg, ph in (('Left', 1, 0.0), ('Right', -1, 1.3)):
+        p.rot(side + 'Arm', -8 + 4 * S(w + ph), sg * (-6 + 5 * S(w + ph)), 0)
+        p.rot(side + 'ForeArm', -18 - 6 * S(w + ph + 0.6), 0, 0)
+        p.rot(side + 'Hand', 28, 0, 0)
+        p.rot(side + 'UpLeg', -6 + 4 * S(w + ph), sg * 3, 0)
+        p.rot(side + 'Leg', 26 + 6 * S(w + ph + 0.8), 0, 0)
+        p.rot(side + 'Foot', 18, 0, 0)
+        curl_all(p, sg, 22, thumb=8)
+    return p
+
+
 def clip_tpose(t, D=1.0):
     p = Pose()
     p.rot('LeftArm', 0, -60, 0); p.rot('RightArm', 0, 60, 0)
@@ -278,6 +300,7 @@ CLIPS = {
     'Cry': (clip_cry, 3.0, 'loop'),
     'Angry': (clip_angry, 2.0, 'loop'),
     'Cheer': (clip_cheer, 1.2, 'loop'),
+    'Stunned': (clip_stunned, 2.0, 'loop'),
     'TPose': (clip_tpose, 1.0, 'loop'),
 }
 
