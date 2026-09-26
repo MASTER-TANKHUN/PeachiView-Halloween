@@ -400,7 +400,7 @@ export class Night3 extends NightBase {
   idleUpdate(dt, t) {
     this.boss.fx(dt);
     this.waiting.update(dt, t, this.player);
-    if (this.krasue.visible) this.krasue.update(dt, t, {});
+    if (this.krasue.visible && !this.krasue.onSet) this.krasue.update(dt, t, {});
   }
 
   _hud() {

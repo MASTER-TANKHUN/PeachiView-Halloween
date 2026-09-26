@@ -230,6 +230,7 @@ export class Director {
     this.power.update(dt, t);
     if (paused) return;
     if (this.state === 'menu') this.menu.update(dt);
+    if (this.state === 'ending') this.ending.update(dt, t);
     if (walking && !cut.active && !hide.hidden) player.update(dt);
     hide.update(dt);
     Scream.update(dt);
@@ -246,7 +247,11 @@ export class Director {
     this.night.abort();
     UI.setHudMode('cine');
     UI.showScreen('play');
-    await this.ending.play({ cut: this.cut, peachi: this.peachi, level: this.level, stats: stats || this.night.statRows() });
+    const n3 = this.nights[3];
+    await this.ending.play({
+      cut: this.cut, peachi: this.peachi, level: this.level, stats: stats || this.night.statRows(),
+      actors: { krasue: this.krasue, pop: n3 && n3.pop, boss: n3 && n3.boss },
+    });
     if (run !== this.run) return;
     this.toMenu();
   }

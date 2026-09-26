@@ -1,7 +1,8 @@
 // The normal ending (1 Nov, dawn): Peachi is herself again, explains PeachiBot, asks "ยังคิดถึงกันมั้ยคะ?"
 // (the "ไม่" button runs from the mouse), a shooting star takes one wish, "I'll see you soon", the mod
 // ends the stream. Then the stream-ended card, the Happy Halloween card (save it as a PNG) and the credits
-// (made by Master Tankhun), and a last wave from the shadow.
+// (made by Master Tankhun), the bloopers (four NG takes with the real cast) and a last wave from the shadow.
+import * as THREE from 'three';
 import { UI } from '../ui.js';
 import { sfx } from '../audio.js';
 import { Save } from './save.js';
@@ -27,8 +28,11 @@ const CREDITS = [
 export class Ending {
   constructor() { this._dom(); }
 
-  /** Runs the whole ending. ctx: { cut, peachi, level, stats: [[label, value]] }. Resolves when the credits end. */
-  async play({ cut, peachi, level, stats = [] }) {
+  /**
+   * Runs the whole ending. ctx: { cut, peachi, level, stats: [[label, value]], actors: { krasue, pop, boss } }.
+   * Resolves when the credits end.
+   */
+  async play({ cut, peachi, level, stats = [], actors = {} }) {
     if (document.pointerLockElement) document.exitPointerLock();
     let wish = WISHES[0];
     await cut.run(async (c) => {
@@ -67,6 +71,8 @@ export class Ending {
     await this._card('ended');
     await this._card('halloween', stats);
     await this._credits();
+    try { await this._bloopers({ cut, peachi, level, actors }); } catch (e) { console.error('[bloopers]', e); }
+    await this._sting();
     UI.fade(0, 400);
   }
 
@@ -141,18 +147,115 @@ export class Ending {
       for (const [cls, text] of CREDITS) el('div', `cr-line ${cls}`, inner, text || '');
       R.classList.add('on');
       const skip = (e) => { if (e.code === 'Enter' || e.code === 'Escape' || e.type === 'click') done(); };
-      const done = async () => {
+      const done = () => {
         window.removeEventListener('keydown', skip); R.removeEventListener('click', skip); clearTimeout(this._crT);
         R.classList.remove('on');
-        // after the credits: the shadow waves from the monitor
-        this.sting.classList.add('on'); sfx.play('glitch', { n: 5 });
-        await wait(2600);
-        this.sting.classList.remove('on');
         resolve();
       };
       window.addEventListener('keydown', skip); R.addEventListener('click', skip);
       this._crT = setTimeout(done, 26000);
     });
+  }
+
+  /** After everything: the shadow waves from the monitor. */
+  async _sting() {
+    this.sting.classList.add('on'); sfx.play('glitch', { n: 5 });
+    await wait(2600);
+    this.sting.classList.remove('on');
+  }
+
+  // ---------------------------------------------------------------- bloopers
+  /** Four NG takes with the real cast (Enter skips all). Actors missing → that take is left out. */
+  async _bloopers({ cut, peachi, level, actors }) {
+    const { krasue, pop, boss } = actors;
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const B = this.bl;
+    let take = 0;
+    const clap = async (c, label) => { // the clapperboard: title card for each take
+      take++;
+      B.take.textContent = `${label} · เทค ${take + 2}`;
+      B.ng.classList.remove('on');
+      UI.subtitle(null);
+      B.clap.classList.add('on'); sfx.play('switch');
+      await c.wait(0.7);
+      B.clap.classList.remove('on');
+    };
+    const ng = async (c) => { B.ng.classList.remove('on'); void B.ng.offsetWidth; B.ng.classList.add('on'); sfx.play('denied'); await c.wait(1.1); };
+    this.onSet = { krasue, pop, boss, cam: cut.camera };
+    await cut.run(async (c) => {
+      UI.fade(1, 10);
+      B.root.classList.add('on');
+      level.setPower(true); level.setFlicker(false);
+      for (const r of ['stream', 'kitchen', 'living', 'hallway']) level.setRoomLights(r, true);
+      peachi.group.visible = false;
+      await c.fade(0, 400);
+
+      if (krasue) { // 1 · Krasue: "it's so hot, can I take my head off?"
+        krasue.reset(); krasue.freeze(); krasue.onSet = true;
+        krasue.place(V(6.3, 1.45, 3.6), V(4.2, 1.5, 3.4)); krasue.setExpression('smile');
+        c.set([4.3, 1.55, 3.4], [6.3, 1.4, 3.6]);
+        await clap(c, 'กระสือ_Official');
+        await c.say('krasue', 'บ๊ายบาย~ ✨ …คัทยังคะ? ร้อนมาก ถอดหัวได้ยัง', { hold: 2400 });
+        krasue.setExpression('annoyed');
+        await c.say('krasue', 'เอ๊ย หัวถอดอยู่แล้วนี่ ถอดตัวต่างหาก… ตัวอยู่ไหนเนี่ย', { hold: 2400 });
+        sfx.play('cackle');
+        await ng(c);
+        krasue.reset(); krasue.onSet = false;
+      }
+      if (pop) { // 2 · Phi Pop asks where to claim the food money
+        pop.reset(); pop.group.visible = true; pop.position.set(-6.2, 0, 3.6); pop.yaw = Math.PI; pop.state = 'eat'; pop.stateT = 0; pop.moving = false;
+        c.set([-6.1, 1.35, 1.7], [-6.2, 1.1, 3.6]);
+        await clap(c, 'ผีปอบ (สายกิน)');
+        await c.say('pop', 'ง่ำๆๆ… ขนมพร็อพนี่กินได้จริงนะหลาน', { hold: 2200 });
+        pop.state = 'burp'; pop.stateT = 0; sfx.play('burp');
+        await c.wait(0.8);
+        pop.state = 'idle';
+        await c.say('pop', 'ว่าแต่… ค่าอาหารเบิกได้ที่ไหน หมูกระทะสามถาดนะ', { hold: 2400 });
+        await ng(c);
+        pop.reset();
+      }
+      if (boss) { // 3 · PeachiBot drops the ban hammer on its own head
+        boss.cameo(V(-5.4, 1.85, -4.6), 'smile');
+        c.set([-4.0, 1.7, -2.6], [-5.4, 1.75, -4.6]);
+        await clap(c, 'PeachiBot');
+        await c.say('bot', 'ขออภัยในความไม่สะดวกค่ะ :) เดี๋ยวบอทจะแบนให้ดูนะคะ', { hold: 2200 });
+        boss.swingTo('window');
+        await c.wait(0.9);
+        boss.swingTo('slam'); boss.setFace('dizzy'); sfx.play('bash'); UI.shake(300); c.shake = 0.01;
+        await c.wait(0.4); c.shake = 0;
+        await c.say('bot', 'ข้อผิดพลาด: ค้อนตกใส่หัวตัวเอง… ขอเทคใหม่นะคะ @_@', { hold: 2400 });
+        await ng(c);
+        boss.stop();
+      }
+      // 4 · the shadow in the hallway waves… it's Peachi, laughing
+      peachi.group.visible = true; peachi.group.position.set(2.2, 0, 0); peachi.group.rotation.y = -Math.PI / 2;
+      peachi.model.setDark(1); peachi._setPose('reach'); peachi._setExpression('happy'); peachi.lookOverride = null;
+      c.set([0.1, 1.45, 0.1], [2.2, 1.2, 0]);
+      await clap(c, 'ตัวดำ (รับเชิญ)');
+      await c.wait(1.6);
+      sfx.play('switch'); peachi.model.setDark(0); peachi._setPose('idle');
+      await c.say('peachi', 'ตกใจมั้ยล่ะ 555 ตัวดำก็พีชชี่เองแหละ! …ฉากนี้ตัดออกด้วยนะ', { hold: 2600 });
+      sfx.play('giggle');
+      await ng(c);
+      await c.fade(1, 500);
+    }, { skippable: true });
+    this.onSet = null;
+    B.root.classList.remove('on');
+    UI.subtitle(null);
+    if (krasue) { krasue.onSet = false; krasue.reset(); }
+    if (pop) pop.reset();
+    if (boss) boss.stop();
+    peachi.model.setDark(0);
+    peachi.group.visible = false;
+  }
+
+  /** While a blooper plays: keep the cast breathing (the director calls this in its 'ending' state). */
+  update(dt, t) {
+    const S = this.onSet;
+    if (!S) return;
+    if (S.krasue && S.krasue.visible) S.krasue.update(dt, t, {});
+    if (S.pop && S.pop.group.visible) S.pop._pose(dt, t);
+    if (S.boss) S.boss.idle(dt, t, S.cam.position);
   }
 
   _dom() {
@@ -166,6 +269,16 @@ export class Ending {
     el('div', 'sting-live', this.sting, '● LIVE');
     el('div', 'sting-wave', this.sting, '👋');
     el('div', 'sting-text', this.sting, 'ปลดล็อก: คืนที่ 249 (เร็วๆ นี้)');
+    const bl = el('div', 'blooper', r); // camcorder frame over the 3D takes
+    el('div', 'bl-rec', bl, '● REC');
+    el('div', 'bl-title', bl, 'บลูเปอร์');
+    const take = el('div', 'bl-take', bl, '');
+    const clap = el('div', 'bl-clap', bl);
+    el('div', 'bl-clap-top', clap);
+    el('div', 'bl-clap-text', clap, 'แอ็กชั่น!');
+    const ng = el('div', 'bl-ng', bl, 'NG!');
+    el('div', 'bl-hint', bl, 'Enter ข้าม');
+    this.bl = { root: bl, take, clap, ng };
     UI.mount(r);
   }
 }

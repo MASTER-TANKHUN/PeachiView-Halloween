@@ -161,6 +161,7 @@ export function createMenuScene({ camera, level, peachi, sfx, UI }) {
     vis.forEach((o, k) => { const h = k === sel; if (o.hot !== h) { o.hot = h; o.draw(); } });
   }
   function pick(i) {
+    if (!active || going) return; // (still loading, or already starting)
     const id = vis[i].n.id;
     blip('pickup');
     if (id === 'play') { going = { t: 0 }; UI.setMenuBusy(true); } else UI.openMenuPanel(id);

@@ -1,6 +1,8 @@
 // Boot: renderer, scene, level, player, Peachi, the title menu and the director (game flow), then the
 // main loop. Debug params: ?autostart=1 (straight into the night; add &prologue=1 for the prologue),
 // ?night=N, ?skip=prologue, ?hour=N, ?speed=N, ?god=1, ?post=0.
+// The loading screen (#boot in index.html) stays up until the 3D Peachi is downloaded, decoded, swapped in
+// and her shaders compiled, so the title never shows the stand-in model (45 s cap, then it goes on anyway).
 import * as THREE from 'three';
 import { buildLevel } from './level.js';
 import { Player } from './player.js';
@@ -13,6 +15,7 @@ import { Save } from './game/save.js';
 import { createPost } from './world/post.js';
 import { createMenuScene } from './menu.js';
 import { Settings } from './settings.js';
+import { preloadModels } from './peachi/peachi3d.js';
 
 const params = new URLSearchParams(location.search);
 const AUTOSTART = params.get('autostart') === '1';
@@ -44,6 +47,14 @@ function onResize() {
 window.addEventListener('resize', onResize);
 
 // ---------------------------------------------------------------- boot
+// start the 3D model download first, so the builds below find it in flight
+const bootEl = document.getElementById('boot');
+const bootFill = document.getElementById('boot-fill');
+const bootText = document.getElementById('boot-text');
+const bootSay = (k, text) => { if (bootFill) bootFill.style.width = `${Math.round(k * 100)}%`; if (bootText) bootText.textContent = text; };
+const modelsReady = preloadModels((k) => bootSay(k * 0.85, k < 1 ? `กำลังโหลดพีชชี่… ${Math.round(k * 100)}%` : 'กำลังแต่งตัวพีชชี่…'))
+  .catch((e) => console.warn('[boot] 3D model preload failed, using the stand-in model:', e));
+
 UI.init();
 UI.showScreen('menu');
 
@@ -118,10 +129,28 @@ function frame() {
   director.afterRender(renderer.domElement);
 }
 
-if (AUTOSTART) {
-  director.autoStart();
-} else {
-  menu.enter();
-  if (params.get('flash') === '1') menu.flashNow();
-}
 requestAnimationFrame(frame);
+
+async function boot() {
+  const until = (fn, ms) => new Promise((resolve) => { const t0 = performance.now(); const tick = () => (fn() || performance.now() - t0 > ms ? resolve() : setTimeout(tick, 50)); tick(); });
+  const cap = new Promise((r) => setTimeout(r, 45000));
+  await Promise.race([modelsReady.then(() => until(() => peachi.model.is3D, 8000)), cap]);
+  // compile her shaders now (visible for the pass), not on the first frame she shows up
+  bootSay(0.95, 'เตรียมห้องสตรีม…');
+  const wasVisible = peachi.group.visible;
+  peachi.group.visible = true;
+  try {
+    if (renderer.compileAsync) await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 8000))]);
+    else renderer.compile(scene, camera);
+  } catch (e) { /* the first frame compiles instead */ }
+  peachi.group.visible = wasVisible;
+  bootSay(1, 'พร้อมแล้ว!');
+  if (bootEl) { bootEl.classList.add('done'); setTimeout(() => bootEl.remove(), 700); }
+  if (AUTOSTART) {
+    director.autoStart();
+  } else {
+    menu.enter();
+    if (params.get('flash') === '1') menu.flashNow();
+  }
+}
+boot();

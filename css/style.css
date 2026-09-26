@@ -733,3 +733,27 @@ kbd {
 
 /* the shop's peach phone case */
 .mphone.case-peach { border-color: #ffb3a0; box-shadow: 0 0 0 5px #ffc9b8, 0 0 0 7px #ff8fb1, 0 18px 40px rgba(0, 0, 0, 0.5); background-image: radial-gradient(circle at 20% 12%, rgba(255, 180, 160, 0.25) 0 8px, transparent 9px), radial-gradient(circle at 80% 88%, rgba(255, 180, 160, 0.25) 0 8px, transparent 9px); }
+
+/* ending: the bloopers, shot on a camcorder */
+.ending > .blooper { background: transparent; pointer-events: none; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25), inset 0 0 120px rgba(0, 0, 0, 0.55); }
+.bl-rec { position: absolute; left: 34px; top: 70px; font-family: var(--f-head); font-weight: 700; font-size: 18px; color: #ff3b4f; animation: blink 1s steps(2) infinite; }
+.bl-title { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); font-family: var(--f-hand); font-size: 30px; color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7); }
+.bl-take { position: absolute; left: 34px; bottom: 76px; font-family: var(--f-head); font-size: 16px; color: #fff; letter-spacing: 0.04em; text-shadow: 0 1px 4px #000; }
+.bl-hint { position: absolute; right: 34px; top: 72px; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.bl-clap { position: absolute; left: 50%; top: 50%; width: 240px; transform: translate(-50%, -50%) scale(0.8); opacity: 0; transition: opacity 0.15s, transform 0.15s; background: #1a1a1f; border-radius: 6px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); }
+.bl-clap.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.bl-clap-top { height: 34px; border-radius: 6px 6px 0 0; background: repeating-linear-gradient(-45deg, #fff 0 20px, #1a1a1f 20px 40px); transform-origin: left bottom; animation: clapShut 0.35s 0.2s ease-in both; }
+.bl-clap-text { padding: 18px 12px; text-align: center; font-family: var(--f-hand); font-size: 30px; color: #fff; }
+@keyframes clapShut { from { transform: rotate(-24deg); } to { transform: rotate(0); } }
+.bl-ng { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-12deg) scale(1.6); opacity: 0; padding: 4px 26px; font-family: var(--f-head); font-weight: 800; font-size: 72px; color: #ff2446; border: 6px solid #ff2446; border-radius: 14px; background: rgba(255, 255, 255, 0.08); }
+.bl-ng.on { animation: ngStamp 1s ease-out forwards; }
+@keyframes ngStamp { 0% { opacity: 0; transform: translate(-50%, -50%) rotate(-12deg) scale(1.8); } 20% { opacity: 1; transform: translate(-50%, -50%) rotate(-12deg) scale(1); } 80% { opacity: 1; } 100% { opacity: 0.9; transform: translate(-50%, -50%) rotate(-12deg) scale(1); } }
+
+/* loading screen (static in index.html, so it shows before any script runs) */
+.boot { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: radial-gradient(ellipse at 50% 40%, #2c1540, #0a0510 70%); color: #efe2f2; transition: opacity 0.6s; }
+.boot.done { opacity: 0; pointer-events: none; }
+.boot-logo { font-family: Sriracha, Kanit, sans-serif; font-size: clamp(48px, 9vw, 96px); color: #ff6fa3; text-shadow: 0 0 0 transparent, 4px 5px 0 rgba(0, 0, 0, 0.45); -webkit-text-stroke: 2px #fff4f8; }
+.boot-sub { font-family: Mitr, Kanit, sans-serif; font-size: 20px; color: #f5d9e6; margin-bottom: 18px; }
+.boot-bar { width: min(360px, 70vw); height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; }
+.boot-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ff6fa3, #ffb36b); border-radius: 4px; transition: width 0.3s ease; }
+.boot-text { font-family: Kanit, sans-serif; font-size: 14px; color: rgba(239, 226, 242, 0.75); }

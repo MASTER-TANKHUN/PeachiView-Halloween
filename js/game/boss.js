@@ -160,6 +160,26 @@ export class Boss {
     this._phase1();
   }
 
+  // ---------------------------------------------------------------- the credits' blooper (no fight)
+  cameo(pos, face) {
+    this._build();
+    this.active = false; this.phase = 3; this.swing = 'rest'; this.st = 0;
+    this.home = pos.clone(); this.pos = pos.clone();
+    this.bot.group.position.copy(pos); this.bot.group.visible = true; this.bot.glow.intensity = 1.2;
+    this.face = ''; this._setFace(face);
+  }
+  swingTo(s) { this.swing = s; this.st = 0; }
+  setFace(f) { this._setFace(f); }
+  /** Float, face `look`, lay the arms (called every frame while the cameo shows). */
+  idle(dt, t, look) {
+    if (!this.bot || !this.bot.group.visible || this.active) return;
+    const B = this.bot;
+    B.group.position.set(this.pos.x, this.pos.y + Math.sin(t * 1.7) * 0.08, this.pos.z);
+    B.head.rotation.y = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
+    B.head.rotation.z = this.face === 'dizzy' ? Math.sin(t * 9) * 0.25 : Math.sin(t * 1.3) * 0.05;
+    this._layArms(t);
+  }
+
   /** Stop fighting, keep the model where it is (lose card / win scene). */
   halt() {
     this.active = false;

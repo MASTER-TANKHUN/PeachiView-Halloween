@@ -376,7 +376,7 @@ export class Night2 extends NightBase {
   }
 
   idleUpdate(dt, t) {
-    this.krasue.update(dt, t, {});
+    if (!this.krasue.onSet) this.krasue.update(dt, t, {}); // (the ending's blooper drives her itself)
     if (this.holder.visible) this._bobPeach(dt, t);
   }
 

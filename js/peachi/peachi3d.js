@@ -37,11 +37,11 @@ const clampAbs = (x, m) => Math.max(-m, Math.min(m, x));
 
 // ---- GLBs are fetched + decoded once per url, then cloned per instance
 const assets = new Map();
-function loadAsset(url, dracoPath) {
+function loadAsset(url, dracoPath, onProgress) {
   let p = assets.get(url);
   if (!p) {
     const draco = new DRACOLoader().setDecoderPath(dracoPath || DRACO_PATH);
-    p = new GLTFLoader().setDRACOLoader(draco).loadAsync(url).finally(() => draco.dispose());
+    p = new GLTFLoader().setDRACOLoader(draco).loadAsync(url, onProgress).finally(() => draco.dispose());
     p.catch(() => assets.delete(url));   // let a later call retry
     assets.set(url, p);
   }
@@ -177,6 +177,21 @@ function disposeMaterials(list) {
     if (m.name.startsWith('Face') && m.map) m.map.dispose();   // the per-instance atlas clones
     m.dispose();
   }
+}
+
+/**
+ * Fetch + decode both GLBs ahead of time (the game's loading screen), before anything builds a Peachi.
+ * onProgress(0..1) follows the download; the promise resolves once both are decoded.
+ */
+export function preloadModels(onProgress) {
+  const list = [[PEACHI_GLB, 5.8e6], [HEADPHONES_GLB, 1.7e5]]; // sizes: a guess until the server says
+  const got = list.map(() => 0), total = list.map(([, s]) => s);
+  const report = () => { if (onProgress) onProgress(Math.min(1, got.reduce((a, b) => a + b, 0) / total.reduce((a, b) => a + b, 0))); };
+  return Promise.all(list.map(([url], i) => loadAsset(url, null, (e) => {
+    if (e && e.total) total[i] = e.total;
+    if (e) got[i] = e.loaded;
+    report();
+  }).then(() => { got[i] = total[i]; report(); })));
 }
 
 export async function loadPeachi(url = PEACHI_GLB, opts = {}) {
