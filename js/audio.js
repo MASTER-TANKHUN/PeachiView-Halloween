@@ -253,6 +253,92 @@ const recipes = {
     tone({ type: 'sine', freq: [300, 700], t, a: 0.005, hold: 0.1, rel: 0.5, vol: 0.3, vib: 120, vibRate: 14 });
     [2093, 2637, 3136, 2637, 2093].forEach((f, i) => tone({ type: 'triangle', freq: f, t: t + 0.25 + i * 0.09, rel: 0.12, vol: 0.07 }));
   },
+  doorbell(t) {
+    // ding… dong (a slightly out-of-tune two-tone chime, it's an old house)
+    for (const [f, dt] of [[659, 0], [523, 0.55]]) {
+      tone({ type: 'sine', freq: f, t: t + dt, a: 0.004, hold: 0.05, rel: 1.6, vol: 0.32, vib: 3, vibRate: 5 });
+      tone({ type: 'triangle', freq: f * 2.01, t: t + dt, a: 0.004, rel: 0.7, vol: 0.07 });
+      tone({ type: 'sine', freq: f * 3.02, t: t + dt, a: 0.004, rel: 0.4, vol: 0.03 });
+    }
+  },
+  creak(t, o = {}) {
+    // slow door hinge: rubbing sawtooth through a narrow band, pitch wandering
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = rand(700, 1100); f.Q.value = 9;
+    f.connect(out(null, o.pan || 0));
+    const len = o.len || rand(0.5, 0.9);
+    tone({ type: 'sawtooth', freq: [rand(140, 190), rand(80, 110)], t, a: 0.08, hold: len, rel: 0.2, vol: (o.vol ?? 1) * 0.3, vib: 22, vibRate: rand(9, 16), dest: f });
+    tone({ type: 'sawtooth', freq: [rand(300, 360), rand(200, 240)], t: t + 0.05, a: 0.1, hold: len * 0.7, rel: 0.2, vol: (o.vol ?? 1) * 0.08, vib: 30, vibRate: 11, dest: f });
+  },
+  doorShut(t, o = {}) {
+    const v = o.vol ?? 1, pan = o.pan || 0;
+    tone({ type: 'sine', freq: [110, 45], t, a: 0.003, rel: 0.3, vol: 0.55 * v, pan });
+    noise({ t, a: 0.002, rel: 0.12, vol: 0.35 * v, filter: 'lowpass', f: 900, pan });
+    noise({ t: t + 0.04, a: 0.001, rel: 0.03, vol: 0.2 * v, filter: 'bandpass', f: 3200, q: 4, pan }); // latch
+  },
+  doorSlam(t, o = {}) {
+    const pan = o.pan || 0;
+    tone({ type: 'sine', freq: [90, 32], t, a: 0.002, rel: 0.55, vol: 0.9, pan });
+    noise({ t, a: 0.002, hold: 0.04, rel: 0.4, vol: 0.6, filter: 'lowpass', f: 1400, pan });
+    for (let i = 0; i < 5; i++) noise({ t: t + 0.08 + i * rand(0.04, 0.07), rel: 0.03, vol: 0.12, filter: 'bandpass', f: rand(1500, 4000), q: 6, pan }); // frame rattle
+  },
+  locked(t) {
+    for (let i = 0; i < 3; i++) {
+      noise({ t: t + i * 0.11, a: 0.001, rel: 0.04, vol: 0.3, filter: 'bandpass', f: rand(2200, 3200), q: 5 });
+      tone({ type: 'square', freq: rand(180, 240), t: t + i * 0.11, a: 0.001, rel: 0.03, vol: 0.05 });
+    }
+  },
+  switch(t) {
+    noise({ t, a: 0.001, rel: 0.018, vol: 0.4, filter: 'highpass', f: 2500 });
+    tone({ type: 'sine', freq: 1900, t, a: 0.001, rel: 0.02, vol: 0.12 });
+  },
+  crunch(t) {
+    for (let i = 0; i < 6; i++) noise({ t: t + i * rand(0.09, 0.14), a: 0.002, rel: rand(0.04, 0.08), vol: 0.28, filter: 'bandpass', f: rand(1800, 4500), q: 1.2 });
+    tone({ type: 'sine', freq: [300, 520], t: t + 0.8, a: 0.01, rel: 0.12, vol: 0.12 }); // happy "mm!"
+  },
+  gasp(t) {
+    noise({ t, a: 0.05, hold: 0.12, rel: 0.25, vol: 0.4, filter: 'bandpass', f: 1400, f1: 2400, q: 1.5 });
+  },
+  inhale(t) { noise({ t, a: 0.12, hold: 0.1, rel: 0.15, vol: 0.14, filter: 'bandpass', f: 900, f1: 1600, q: 1.2 }); },
+  exhale(t) { noise({ t, a: 0.03, hold: 0.15, rel: 0.4, vol: 0.12, filter: 'bandpass', f: 1500, f1: 700, q: 1.2 }); },
+  notify(t) {
+    tone({ type: 'sine', freq: 1568, t, a: 0.003, rel: 0.16, vol: 0.2 });
+    tone({ type: 'sine', freq: 2093, t: t + 0.09, a: 0.003, rel: 0.3, vol: 0.2 });
+  },
+  glitch(t, o = {}) {
+    const n = o.n || 7;
+    for (let i = 0; i < n; i++) {
+      const tt = t + i * rand(0.02, 0.06);
+      tone({ type: 'square', freq: rand(80, 2400), t: tt, a: 0.001, rel: rand(0.015, 0.05), vol: 0.12 });
+      noise({ t: tt, a: 0.001, rel: 0.03, vol: 0.18, filter: 'bandpass', f: rand(500, 6000), q: 3 });
+    }
+  },
+  powerDown(t) {
+    tone({ type: 'sawtooth', freq: [220, 28], t, a: 0.01, hold: 0.1, rel: 1.2, vol: 0.3 });
+    tone({ type: 'sine', freq: [120, 20], t, a: 0.01, rel: 1.4, vol: 0.4 });
+    noise({ t, a: 0.005, rel: 0.2, vol: 0.2, filter: 'highpass', f: 5000 });
+  },
+  endStream(t) {
+    tone({ type: 'sine', freq: 880, t, a: 0.005, rel: 0.12, vol: 0.22 });
+    tone({ type: 'sine', freq: 587, t: t + 0.12, a: 0.005, rel: 0.35, vol: 0.22 });
+  },
+  denied(t) {
+    tone({ type: 'square', freq: 196, t, a: 0.004, hold: 0.12, rel: 0.05, vol: 0.14 });
+    tone({ type: 'square', freq: 185, t: t + 0.2, a: 0.004, hold: 0.25, rel: 0.08, vol: 0.14 });
+  },
+  tinyMusic(t, o = {}) {
+    // music leaking out of the lost headphones: a tiny music-box phrase, panned toward them
+    const vol = (o.vol ?? 1) * 0.16, pan = o.pan || 0;
+    const tune = [784, 988, 1175, 988, 1319, 1175, 988, 784];
+    tune.forEach((f, i) => {
+      tone({ type: 'triangle', freq: f, t: t + i * 0.16, a: 0.004, rel: 0.22, vol, pan });
+      tone({ type: 'sine', freq: f * 2, t: t + i * 0.16, a: 0.004, rel: 0.12, vol: vol * 0.3, pan });
+    });
+  },
+  shutter(t) {
+    noise({ t, a: 0.001, rel: 0.03, vol: 0.35, filter: 'highpass', f: 3000 });
+    noise({ t: t + 0.07, a: 0.001, rel: 0.05, vol: 0.25, filter: 'bandpass', f: 2000, q: 2 });
+  },
   giggle(t) {
     // cute "hi-hi-hi-hii~"
     const n = 4 + Math.floor(Math.random() * 3);
@@ -272,11 +358,12 @@ export const sfx = {
   init() {
     return !!ensure();
   },
-  play(name) {
+  /** opts (some sounds): { pan: -1..1, vol: 0..1 } */
+  play(name, opts) {
     if (!ensure()) return;
     const r = recipes[name];
     if (!r) { console.warn('[sfx] unknown sound', name); return; }
-    try { r(ctx.currentTime + 0.01); } catch (e) { console.warn('[sfx] failed', name, e); }
+    try { r(ctx.currentTime + 0.01, opts || {}); } catch (e) { console.warn('[sfx] failed', name, e); }
   },
   setMaster(v) {
     masterLevel = Math.max(0, Math.min(MASTER_CAP, Number(v) || 0));
@@ -412,5 +499,83 @@ export const ambient = {
     amb.lp.frequency.setTargetAtTime(160 + k * 700, t, 0.5);
     amb.highG.gain.setTargetAtTime(k * k * 0.03, t, 0.5);
     amb.hbGain.gain.setTargetAtTime(0.12 + k * 0.9, t, 0.3);
+  },
+};
+
+// ---------- voices: Animal-Crossing-style babble, one blip per syllable ----------
+// The same text always sounds the same (pitches come from the characters), so lines have a "tune".
+const THAI_CONS = /[ก-ฮ]/;
+const LATIN = /[A-Za-z0-9]/;
+const VOICES = {
+  // Peachi: bright and bouncy
+  peachi: { base: 560, spread: 0.32, dur: 0.062, gap: 0.014, type: 'triangle', formant: 1900, q: 1.4, vol: 0.2, vib: 14 },
+  // Peachi before she gets her headphones back: the same voice through a broken stream
+  peachiBroken: { base: 520, spread: 0.45, dur: 0.07, gap: 0.02, type: 'triangle', formant: 1500, q: 2.5, vol: 0.18, vib: 40, broken: 0.4 },
+  // PeachiBot: modem beeps, perfectly on grid
+  bot: { base: 880, spread: 0.6, dur: 0.045, gap: 0.03, type: 'square', formant: 2400, q: 0.8, vol: 0.07, vib: 0, steps: [1, 1.5, 2, 1.25, 0.75] },
+  // "เธอ" and other whispers: breathy, no pitch
+  whisper: { base: 300, spread: 0.2, dur: 0.08, gap: 0.03, type: 'sine', formant: 2600, q: 5, vol: 0.05, vib: 0, breath: 1 },
+};
+let voiceBus = null, voiceTimer = 0;
+function hashChar(c) { const x = c.codePointAt(0); return ((x * 2654435761) >>> 0) / 4294967296; }
+function syllables(text) {
+  const out = [];
+  let latin = 0;
+  for (const ch of String(text)) {
+    if (THAI_CONS.test(ch)) out.push(ch);
+    else if (LATIN.test(ch)) { if (latin++ % 2 === 0) out.push(ch); }
+    else latin = 0;
+  }
+  return out.slice(0, 26);
+}
+export const voice = {
+  /**
+   * Babble `text` in a character's voice. Returns the duration in seconds.
+   * opts: { pan, vol, pitch (multiplier) }
+   */
+  speak(text, who = 'peachi', opts = {}) {
+    if (!ensure()) return 0;
+    const V = VOICES[who] || VOICES.peachi;
+    if (!voiceBus) { voiceBus = ctx.createGain(); voiceBus.gain.value = 1; voiceBus.connect(master); }
+    this.stop();
+    const bus = ctx.createGain(); bus.gain.value = opts.vol ?? 1; bus.connect(voiceBus);
+    voiceTimer = bus;
+    const syl = syllables(text);
+    const str = String(text).trim();
+    const ask = /[?？]$|มั้ย|ไหม|หรอ|เหรอ/.test(str.slice(-6));
+    const shout = /!|!!/.test(str) || /ดดด|ออออ|กกก/.test(str);
+    const pitch = (opts.pitch || 1) * (shout ? 1.12 : 1);
+    let t = ctx.currentTime + 0.02;
+    const pan = opts.pan || 0;
+    syl.forEach((ch, i) => {
+      const h = hashChar(ch);
+      const last = i === syl.length - 1;
+      let f = V.base * pitch * (V.steps ? V.steps[Math.floor(h * V.steps.length)] : 1 + (h - 0.5) * V.spread);
+      if (last && ask) f *= 1.25;
+      if (last && !ask && !V.steps) f *= 0.9;
+      const dur = V.dur * (last ? 1.6 : 1) * (0.85 + h * 0.3);
+      if (V.broken && Math.random() < V.broken) { // a dropped syllable: crackle instead of voice
+        noise({ t, a: 0.002, rel: dur * 0.8, vol: V.vol * 0.9, filter: 'bandpass', f: rand(800, 4000), q: 2, pan, dest: bus });
+      } else if (V.breath) {
+        noise({ t, a: 0.02, hold: dur * 0.3, rel: dur, vol: V.vol * 2.5, filter: 'bandpass', f: V.formant * (0.8 + h * 0.4), q: V.q, pan, dest: bus });
+      } else {
+        const fl = ctx.createBiquadFilter();
+        fl.type = 'peaking'; fl.frequency.value = V.formant * (0.8 + h * 0.5); fl.Q.value = V.q; fl.gain.value = 9;
+        fl.connect(out(bus, pan));
+        tone({ type: V.type, freq: [f * 1.06, f * (last && ask ? 1.18 : 0.96)], t, a: 0.006, hold: dur * 0.45, rel: dur * 0.55, vol: V.vol, vib: V.vib, vibRate: 18, dest: fl });
+        tone({ type: 'sine', freq: f * 2, t, a: 0.006, rel: dur * 0.5, vol: V.vol * 0.25, dest: fl });
+        if (!V.steps) noise({ t, a: 0.001, rel: 0.014, vol: V.vol * 0.35, filter: 'highpass', f: 4200, pan, dest: bus }); // consonant tick
+      }
+      t += dur + V.gap * (0.6 + h * 0.8);
+      if (ch === ' ' || (i % 5 === 4 && !V.steps)) t += V.gap;
+    });
+    return t - ctx.currentTime;
+  },
+  stop() {
+    if (voiceTimer && ctx) {
+      const b = voiceTimer; voiceTimer = 0;
+      b.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+      setTimeout(() => { try { b.disconnect(); } catch {} }, 300);
+    }
   },
 };

@@ -4,6 +4,7 @@ import { buildPeachi } from '../peachi/model.js';
 import { UI } from '../ui.js';
 import { sfx } from '../audio.js';
 import { peachiLines } from '../data/chat.js';
+import { Talk } from '../game/talk.js';
 
 const pick = (arr) => (arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : null);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -15,6 +16,8 @@ const TELEPORT_LINES = [
   'เซอร์ไพรส์! พีชชี่วาร์ปได้ด้วยนะ',
   'เดินหนีทำไมอ่า~ คิกๆ',
 ];
+const SEARCH_LINES = ['อยู่นี่รึเปล่าน้า~', 'ได้ยินเสียงหายใจนะ…', 'มอดดด ออกมาเถอะน่า~', 'ซ่อนแอบเหรอ… พีชชี่เก่งเกมนี้นะ'];
+const GIVEUP_LINES = ['ไม่อยู่แฮะ… ไปไหนแล้วอะ', 'หายไปไหนนน… ก็ได้ ไม่หาแล้ว', 'เล่นซ่อนแอบไม่เนียนเลย… เอ๊ะ หรือเนียนนะ'];
 const MISS_TOASTS = [
   'ตะโกนใส่อากาศ… พีชชี่อยู่ไกลเกินไป',
   'ตะโกนใส่อากาศ… ข้างบ้านตื่นแทน',
@@ -49,8 +52,12 @@ export class PeachiGhost {
 
   reset(spawnPos) {
     this.mood = 0;
-    this.state = 'roam'; // 'roam' | 'chase' | 'stunned' | 'jumpscare'
+    this.state = 'roam'; // 'roam' | 'chase' | 'stunned' | 'search' | 'jumpscare'
     this.active = false;
+    this.hold = false;           // stay put (a request wants her company)
+    this.lookOverride = null;    // Vector3 her head follows instead of the camera (scenes)
+    this.search = null;          // { target, real, checking, t }
+    this.moodScale = 1;
     this.stunTimer = 0;
     this.lonely = 0;
     this.knock.set(0, 0, 0);
@@ -75,17 +82,36 @@ export class PeachiGhost {
     this._setFlicker(false);
   }
 
-  say(key, ms = 2800) {
+  say(key, ms) {
     const line = pick(peachiLines && peachiLines[key]);
-    if (line) UI.subtitle(line, ms);
+    if (line) this.line(line, ms);
+  }
+  line(text, ms) { Talk.say('peachi', text, { at: this.group.position, ms }); }
+
+  /** The player hid while she was after them: come and look. real = she heads for the right spot. */
+  startSearch(target, real) {
+    if (this.state === 'jumpscare') return;
+    this.state = 'search';
+    this.search = { target: target.clone(), real, checking: false, t: 0 };
+    this.target = null;
+  }
+  /** Give up searching: back to a lonely mood, somewhere else in the house. */
+  endSearch() {
+    if (this.state !== 'search') return;
+    this.search = null;
+    this.state = 'roam';
+    this.mood = Math.min(this.mood, 32);
+    this.line(pick(GIVEUP_LINES));
+    this.teleportTimer = rand(12, 18);
   }
 
   // ---------------------------------------------------------------- update
   update(dt, t, ctx) {
-    if (ctx && ctx.camera && this.state !== 'jumpscare') this.model.lookAt(ctx.camera.getWorldPosition(this._eye || (this._eye = new THREE.Vector3())));
+    if (this.lookOverride) this.model.lookAt(this.lookOverride);
+    else if (ctx && ctx.camera && this.state !== 'jumpscare') this.model.lookAt(ctx.camera.getWorldPosition(this._eye || (this._eye = new THREE.Vector3())));
     this.model.update(dt, t);
     if (!this.active || !ctx) return;
-    const { player, camera, hour = 0 } = ctx;
+    const { player, camera, hour = 0, hidden = false } = ctx;
     const pos = this.group.position;
     const pp = player.position;
     const dx = pp.x - pos.x, dz = pp.z - pos.z;
@@ -93,6 +119,7 @@ export class PeachiGhost {
     this.distToPlayer = dist;
 
     if (this.state === 'jumpscare') { this._updateJumpscare(dt, player, camera); return; }
+    if (this.state === 'search') { this._updateSearch(dt); return; }
 
     // knockback after a scream stun (≈3 m total)
     if (this.knock.lengthSq() > 1e-4) {
@@ -106,7 +133,7 @@ export class PeachiGhost {
       this.stunTimer -= dt;
       if (this.stunTimer <= 0) { this.state = 'roam'; this._setPose('float'); }
     } else {
-      let rate = 1.2;
+      let rate = 1.2 * this.moodScale;
       if (hour >= 3) rate *= 1.5;
       if (this.lonely > 20) rate *= 1.6;           // nobody visits her → lonely → faster
       else if (dist < 5 && this.mood < 50) rate *= 0.6; // company calms her down
@@ -132,7 +159,7 @@ export class PeachiGhost {
     // --- movement
     let moveX = 0, moveZ = 0;
     if (!stunned) {
-      if (mood === 'angry') {
+      if (mood === 'angry' && !hidden) {
         this.state = 'chase';
         let speed = hour >= 4 ? 2.6 : 1.6;
         if (this.mood >= 80) speed *= 1.3;
@@ -146,11 +173,11 @@ export class PeachiGhost {
       } else {
         this.state = 'roam';
         this.lit = false;
-        [moveX, moveZ] = this._roamStep(dt);
-        this._setPose('float');
+        if (!this.hold) [moveX, moveZ] = this._roamStep(dt);
+        this._setPose(this.hold ? 'idle' : 'float');
         this.teleportTimer -= dt;
-        if (this.teleportTimer <= 0) {
-          this.teleportTimer = rand(16, 28);
+        if (this.teleportTimer <= 0 && !this.hold && !hidden) {
+          this.teleportTimer = hour >= 4 ? rand(9, 15) : rand(16, 28);
           if (dist > 8 && Math.random() < 0.6) this._teleportBehind(player);
         }
       }
@@ -181,7 +208,7 @@ export class PeachiGhost {
     }
 
     // --- touch → jumpscare
-    if (!stunned && mood === 'angry' && Math.hypot(pp.x - pos.x, pp.z - pos.z) < TOUCH_RANGE) {
+    if (!stunned && !hidden && mood === 'angry' && Math.hypot(pp.x - pos.x, pp.z - pos.z) < TOUCH_RANGE) {
       this._startJumpscare(player, camera);
     }
   }
@@ -218,9 +245,39 @@ export class PeachiGhost {
     this.group.position.set(best.x, 0, best.z);
     this.target = null;
     sfx.play('giggle');
-    UI.subtitle(pick(TELEPORT_LINES), 2600);
+    this.line(pick(TELEPORT_LINES), 2600);
     return true;
   }
+
+  _updateSearch(dt) {
+    const S = this.search, pos = this.group.position;
+    const dx = S.target.x - pos.x, dz = S.target.z - pos.z, d = Math.hypot(dx, dz);
+    this._setExpression(S.checking ? 'happy' : 'angry');
+    this.model.setGlow(0.6 + 0.2 * Math.sin(S.t * 6));
+    S.t += dt;
+    if (!S.checking) {
+      if (d > 0.9) {
+        const step = Math.min(d - 0.85, 1.9 * dt);
+        pos.x += (dx / d) * step; pos.z += (dz / d) * step;
+        this._setPose('float');
+      } else {
+        S.checking = true; S.t = 0;
+        this._setPose('reach');
+        this.line(pick(SEARCH_LINES), 2600);
+        sfx.play('whisper');
+      }
+    }
+    const want = Math.atan2(dx, dz);
+    let r = want - this.group.rotation.y;
+    r = ((r + Math.PI) % TAU + TAU) % TAU - Math.PI;
+    this.group.rotation.y += r * Math.min(1, dt * 5);
+    pos.y = 0;
+  }
+  /** Seconds she has been checking the spot (0 if not there yet). */
+  get checkingFor() { return this.search && this.search.checking ? this.search.t : 0; }
+
+  /** Found the player in their hiding spot. */
+  catchHidden(player, camera) { this.search = null; this._startJumpscare(player, camera); }
 
   // ---------------------------------------------------------------- events
   /** Player screamed. Returns 'stun' | 'miss' | null (ignored). */
@@ -251,6 +308,13 @@ export class PeachiGhost {
   onHeadphonesFound() {
     this.mood = Math.max(0, this.mood - 30);
     this.say('found', 3200);
+  }
+
+  /** Drop every behavior and stand still (cutscenes). */
+  freeze() {
+    this.active = false; this.search = null; this.hold = false;
+    this.state = 'roam';
+    this._setFlicker(false);
   }
 
   // ---------------------------------------------------------------- jumpscare

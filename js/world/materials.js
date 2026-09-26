@@ -58,6 +58,7 @@ export function createMaterials() {
     emit: basic(),
     emitFlicker: basic(),
     emitRGB: basic(),
+    emitFairy: basic(), // fairy-light bulbs (each room's switch turns its own off)
     // soft additive glows (light shafts, halos) — never cast/receive shadows
     haze: basic({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
     ceiling: std({ map: plaster.map, normalMap: plaster.normalMap, normalScale: new THREE.Vector2(0.08, 0.08), roughness: 0.95, envMapIntensity: 0.1 }),

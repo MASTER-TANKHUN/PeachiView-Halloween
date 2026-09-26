@@ -110,5 +110,19 @@ export const UI = {
 export const normalChat = [{ user, text }], spamChat = [{ user, text }], superChats = [{ user, text, amount }]
 export const peachiLines = { happy: [], cry: [], angry: [], scream: [], stunned: [], found: [], win: [] } // Thai, funny
 ```
-### D: `js/main.js`, `js/night.js`, `js/ghosts/peachi.js`
-Renderer/scene/camera/loop, state machine menu → intro → play → gameover/win → retry; Night 1 rules above; Peachi AI (mood 0..100: <25 happy, <50 cry, <80 angry(chase), touch while angry → jumpscare). Save `localStorage['peachi.nightCleared']`.
+### Game flow (week 1 onward)
+```
+js/main.js              boot: renderer, level, player, Peachi, title menu, Director, loop
+js/game/director.js     title → DM + prologue (first time) → night card → night → ending scene → win/lose card
+js/game/save.js         localStorage 'peachi.save' (nights cleared, prologue seen, stats, achievements)
+js/game/cutscene.js     async scenes: camera moves, subtitles, waits; Enter skips
+js/game/talk.js         every spoken line: subtitle + babble voice (audio.js `voice`), Peachi's broken voice
+js/nights/base.js       shared night: clock + scripted events at(hour), viewers, chat, hiding + search, lose/win
+js/nights/night1.js     headphones, requests schedule, webcam scare 02:00, music hint 03:00, "เธอ" 04:00, ending
+js/nights/prologue.js   DM, porch tutorial, doorbell, first meeting
+js/systems/doors.js     E doors (animated leaves + colliders), locked doors, light switches
+js/systems/hide.js      hiding spots, peek view, hold breath / stay quiet
+js/systems/requests.js  Peachi's requests (hungry, dark, lonely)
+js/ghosts/peachi.js     Peachi AI: mood, chase, stun, teleport, search a hiding spot, jumpscare
+js/data/chat.js story.js   Thai text
+```

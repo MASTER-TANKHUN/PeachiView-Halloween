@@ -7,6 +7,7 @@ import { roomHall, roomGuest } from './room_hall.js';
 import { roomBath } from './room_bath.js';
 import { roomKitchen } from './room_kitchen.js';
 import { roomLiving } from './room_living.js';
+import { roomPorch } from './room_porch.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -34,10 +35,10 @@ function webMaterial() {
 export function furnish(kit, M, root, plan) {
   M.web = webMaterial();
   const P = makeProps(kit, M, root);
-  const rooms = [roomPeachi, roomHall, roomGuest, roomBath, roomKitchen, roomLiving].map((f) => f(P, kit, M, root));
+  const rooms = [roomPeachi, roomHall, roomGuest, roomBath, roomKitchen, roomLiving, roomPorch].map((f) => f(P, kit, M, root));
 
   const lights = [], points = { itemSpots: [], ghostSpawns: [], navPoints: [] };
-  let deskPosition = null, spawn = null;
+  let deskPosition = null, spawn = null, porch = null;
   const screens = {};
   for (const r of rooms) {
     lights.push(...r.lights);
@@ -47,7 +48,9 @@ export function furnish(kit, M, root, plan) {
     if (r.deskPosition) deskPosition = r.deskPosition;
     if (r.spawn) spawn = r.spawn;
     if (r.screens) Object.assign(screens, r.screens);
+    if (r.porch) porch = r.porch;
   }
+  points.porch = porch;
   points.deskPosition = deskPosition;
   points.spawn = spawn;
   return { lights, points, screens, update(dt, t, flick) { for (const r of rooms) r.update && r.update(dt, t, flick); } };

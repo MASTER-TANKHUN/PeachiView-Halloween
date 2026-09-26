@@ -446,7 +446,9 @@ export function buildPeachi({ ghost = true } = {}) {
     W(head, 'hair', g, { outline: 0 });
   }
   // ---- headphones + anger mark
-  buildHeadphones((key, g, opts) => { g.translate(HC.x, HC.y, HC.z); W(head, key, g, opts); }, atlas);
+  // (in their own group so the story can take them off her: Night 1 is about finding them)
+  const phones = new THREE.Group(); phones.name = 'headphones'; phones.userData.o = head.userData.o; head.add(phones);
+  buildHeadphones((key, g, opts) => { g.translate(HC.x, HC.y, HC.z); W(phones, key, g, opts); }, atlas);
 
   // =================================================================== neck, torso, crop top, choker
   W(torso, 'skin', limb(0.13, 0.0295, 0.031, 14, 8, { cap0: 0.01, cap1: 0.01 }).translate(0, 1.425, -0.006), { color: C.skin });
@@ -771,6 +773,11 @@ export function buildPeachi({ ghost = true } = {}) {
     setGlow(v) { glow = THREE.MathUtils.clamp(v, 0, 1); U.uGlow.value = glow; },
     /** 0..1: fade her to a pitch-black silhouette */
     setDark(v) { U.uDark.value = THREE.MathUtils.clamp(v, 0, 1); },
+    /** 0..1: drain her colors toward a cold ghost-grey (she gets them back after Night 2) */
+    setDesat(v) { U.uDesat.value = THREE.MathUtils.clamp(v, 0, 1); },
+    /** Show / hide the cat-ear headphones on her head. */
+    setHeadphones(on) { phones.visible = !!on; },
+    get headphones() { return phones.visible; },
     /** World-space point for her head to follow (e.g. the camera), or null. */
     lookAt(v) { lookTarget = v ? (lookTarget || V()).copy(v) : null; },
     update(dt, t) {

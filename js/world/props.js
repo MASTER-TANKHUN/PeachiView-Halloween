@@ -187,7 +187,7 @@ export function makeProps(kit, M, root) {
     const cols = Array.isArray(color) ? color : [color];
     for (let i = 1; i < n; i++) {
       const t = i / n, p = new THREE.Vector3().lerpVectors(a, b, t).add(_v.set(0, -sag * 4 * t * (1 - t) - 0.012, 0));
-      add('emit', S.sphere(0.009, 8, 6), { p: [p.x, p.y, p.z], s: [1, 1.4, 1], color: cols[i % cols.length], emit, ao: false });
+      add('emitFairy', S.sphere(0.009, 8, 6), { p: [p.x, p.y, p.z], s: [1, 1.4, 1], color: cols[i % cols.length], emit, ao: false });
     }
   }
   function bunting(a, b, n = 10, colors = [0xff7a1a, 0x1a1020, 0x8a4ac8]) { // pennant flags on a string

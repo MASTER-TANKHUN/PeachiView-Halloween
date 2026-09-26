@@ -13,9 +13,10 @@ function openingsOn(plan, axis, at, a, b) {
   return plan.openings.filter((o) => o.axis === axis && Math.abs(o.at - at) < 1e-6 && o.c > a && o.c < b).sort((p, q) => p.c - q.c);
 }
 
-export function buildShell(kit, plan) {
+export function buildShell(kit, plan, M, root) {
   const { H, T } = plan;
   const half = T / 2;
+  const doors = [];
 
   // ------------------------------------------------ walls
   // A wall slab for one room side: runs along `axis` at coordinate `at`, from a to b, thickness `th`
@@ -80,9 +81,10 @@ export function buildShell(kit, plan) {
     kit.add('floor_' + r.floor, S.box(r.x1 - r.x0, 0.06, r.z1 - r.z0), { p: [(r.x0 + r.x1) / 2, -0.03, (r.z0 + r.z1) / 2], uv: 'world', ao: false });
     kit.add('ceiling', S.plane(r.x1 - r.x0, r.z1 - r.z0), { p: [(r.x0 + r.x1) / 2, H, (r.z0 + r.z1) / 2], r: [Math.PI / 2, 0, 0], uv: 'world', ao: false, color: r.ceiling ?? 0xd8d0d8 });
   }
-  // colliders: every wall slab outside door openings (full thickness, both rooms at once)
+  // colliders: every wall slab outside door openings (full thickness, both rooms at once); a door leaf
+  // gets its own collider that is switched off while it stands open
   for (const w of plan.wallLines) {
-    const ops = openingsOn(plan, w.axis, w.at, w.a, w.b).filter((o) => o.y0 === 0 && o.kind === 'door' && !o.closed);
+    const ops = openingsOn(plan, w.axis, w.at, w.a, w.b).filter((o) => o.y0 === 0 && o.kind === 'door');
     let cur = w.a;
     const col = (u0, u1) => { if (u1 - u0 < 1e-3) return; const c = (u0 + u1) / 2; if (w.axis === 'x') kit.collide(c, w.at, u1 - u0, T); else kit.collide(w.at, c, T, u1 - u0); };
     for (const o of ops) { col(cur, o.c - o.w / 2); cur = o.c + o.w / 2; }
@@ -117,18 +119,29 @@ export function buildShell(kit, plan) {
           kit.add('paint', S.rbox(w + 0.1, 0.07, 0.016, 0.005), { p: [0, y0 - 0.065, zc], color: col });
         }
       }
-      if (o.kind === 'door' && o.leaf) doorLeaf(kit, o);
+      if (o.kind === 'door' && o.leaf) doors.push(doorLeaf(kit, o, M, root, T));
       if (o.kind === 'door' && o.threshold) kit.add('wood', S.rbox(w, 0.012, T + 0.02, 0.004), { p: [0, 0.006, 0], color: 0x6a4a34 });
       if (o.kind === 'window') windowFrame(kit, o, T);
     });
   }
+  return { doors };
 }
 
-/** Panel door on a hinge; o.leaf = { hinge: -1|1 (side along the wall), open: radians, swing: +1|-1 (into which face), color } */
-function doorLeaf(kit, o) {
+/**
+ * Panel door on a hinge, built as its own movable object (called inside the opening's frame).
+ * o.leaf = { hinge: -1|1 (side along the wall), open: radians, swing: +1|-1 (into which face), color }
+ * Returns { id, o, pivot, swing, sign, openAngle, angle, collider }: rotate swing.rotation.y = sign * angle.
+ */
+function doorLeaf(kit, o, M, root, T) {
   const L = o.leaf, w = o.w - 0.05, h = o.y1 - 0.02, th = 0.04;
   const hx = L.hinge * (o.w / 2 - 0.03);
-  kit.at(hx, 0, L.swing * 0.02, L.hinge * L.swing * (L.open ?? 1.6), () => {
+  const pivot = new THREE.Group();
+  pivot.name = 'door_' + (o.id || o.c);
+  pivot.position.copy(kit.world(hx, 0, L.swing * 0.02));
+  pivot.rotation.y = o.axis === 'x' ? 0 : Math.PI / 2;
+  const swing = new THREE.Group();
+  pivot.add(swing);
+  const leaf = kit.capture(M, () => {
     kit.at(-L.hinge * w / 2, 0, 0, 0, () => {
       const col = L.color ?? 0xefe6dc;
       kit.add(L.mat ?? 'paint', S.rbox(w, h, th, 0.008), { p: [0, h / 2 + 0.01, 0], color: col });
@@ -146,6 +159,20 @@ function doorLeaf(kit, o) {
       for (const hy of [0.25, h - 0.25]) kit.add('metal', S.cyl(0.008, 0.008, 0.09, 8), { p: [L.hinge * (w / 2 + 0.004), hy, 0], color: 0x9a8a6a });
     });
   });
+  swing.add(leaf);
+  root.add(pivot);
+  // closed-door collider across the opening (world space, XZ)
+  const [cx, cz] = o.axis === 'x' ? [o.c, o.at] : [o.at, o.c];
+  const collider = o.axis === 'x'
+    ? { x0: cx - o.w / 2, x1: cx + o.w / 2, z0: cz - T / 2, z1: cz + T / 2, off: false }
+    : { x0: cx - T / 2, x1: cx + T / 2, z0: cz - o.w / 2, z1: cz + o.w / 2, off: false };
+  kit.colliders.push(collider);
+  const door = { id: o.id || String(o.c), o, pivot, swing, sign: L.hinge * L.swing, openAngle: L.open || 1.5, angle: 0, collider, center: new THREE.Vector3(cx, 1.3, cz) };
+  const angle = o.closed ? 0 : door.openAngle;
+  door.angle = angle;
+  swing.rotation.y = door.sign * angle;
+  collider.off = angle > 0.35;
+  return door;
 }
 
 function windowFrame(kit, o, T) {
@@ -202,9 +229,33 @@ function drawNight(g, w, h, seed) {
   g.fillStyle = 'rgba(8,6,12,1)'; g.fillRect(0, h * 0.93, w, h * 0.07);
 }
 
+let nightTex = null;
+const nightTexture = () => nightTex || (nightTex = art(1024, 512, (g, w, h) => drawNight(g, w, h, 7), { fonts: false }));
+
+/** A painted night-street backdrop plane (w × h m) at (x, y, z) turned by ry (front +z). */
+export function backdrop(root, x, y, z, ry, w = 7, h = 3.5, offset = 0, dim = 0.55) {
+  const t = nightTexture().clone(); t.needsUpdate = true; t.wrapS = THREE.RepeatWrapping; t.offset.x = offset; t.repeat.x = Math.min(1, w / 11);
+  const mat = new THREE.MeshBasicMaterial({ map: t, toneMapped: false, color: new THREE.Color(dim, dim, dim * 1.12) });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  m.position.set(x, y, z); m.rotation.y = ry; m.name = 'outside';
+  root.add(m);
+  return m;
+}
+
+/** A curved painted panorama (inside of a cylinder arc) around (cx, cz), centered on direction `dir` (rad, 0 = +z). */
+export function panorama(root, cx, cz, r, dir, arc = 2.6, y0 = -1, h = 6.5, dim = 0.6) {
+  const t = nightTexture().clone(); t.needsUpdate = true; t.wrapS = THREE.RepeatWrapping; t.repeat.x = Math.max(1, Math.round(r * arc / 10));
+  const mat = new THREE.MeshBasicMaterial({ map: t, toneMapped: false, side: THREE.BackSide, color: new THREE.Color(dim, dim, dim * 1.12) });
+  const geo = new THREE.CylinderGeometry(r, r, h, 48, 1, true, dir - arc / 2, arc);
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(cx, y0 + h / 2, cz); m.name = 'outside';
+  root.add(m);
+  return m;
+}
+
 /** Backdrop planes outside the windows (unique textures, so separate meshes). */
 export function buildOutside(root, plan) {
-  const tex = art(1024, 512, (g, w, h) => drawNight(g, w, h, 7), { fonts: false });
+  const tex = nightTexture();
   tex.wrapS = THREE.RepeatWrapping;
   const meshes = [];
   plan.openings.filter((o) => o.kind === 'window' || o.outside).forEach((o, i) => {
@@ -212,7 +263,7 @@ export function buildOutside(root, plan) {
     const mat = new THREE.MeshBasicMaterial({ map: t, toneMapped: false, color: new THREE.Color(0.55, 0.55, 0.62) });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(7, 3.5), mat);
     const out = -(o.inside ?? 1); // which side of the wall line is outside (+ along the normal axis)
-    const d = 2.8;
+    const d = o.view ?? 2.8;
     if (o.axis === 'x') { m.position.set(o.c, 1.5, o.at + out * d); m.rotation.y = out > 0 ? Math.PI : 0; } else { m.position.set(o.at + out * d, 1.5, o.c); m.rotation.y = out > 0 ? -Math.PI / 2 : Math.PI / 2; }
     m.name = 'outside';
     root.add(m); meshes.push(m);

@@ -184,6 +184,7 @@ export class Kit {
       geo.computeBoundingSphere();
       const mesh = new THREE.Mesh(geo, mat);
       mesh.name = key;
+      mesh.userData.region = bin.split('@')[1] || null;
       mesh.matrixAutoUpdate = false;
       const emissive = mat.isMeshBasicMaterial || mat.userData.noShadow;
       mesh.castShadow = shadows && !emissive && !mat.transparent;

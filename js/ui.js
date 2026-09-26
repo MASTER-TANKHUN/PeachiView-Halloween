@@ -34,6 +34,8 @@ let currentScreen = null;
 let menuPanel = null;       // open panel on the title screen
 let pausePanel = null;      // open panel on the pause screen
 let sound = () => {};       // UI blips (set by main once audio exists)
+let dmDone = null;          // resolver of the phone-DM screen
+let fadeTimer = 0;
 
 function el(tag, cls, parent, text) {
   const n = document.createElement(tag);
@@ -48,6 +50,12 @@ const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const now = () => performance.now();
 const fire = (k, ...a) => { for (const f of cbs[k]) f(...a); };
 
+function clearedNight1() {
+  try {
+    const d = JSON.parse(localStorage.getItem('peachi.save') || 'null');
+    return !!(d && Array.isArray(d.nightsCleared) && d.nightsCleared.includes(1)) || !!localStorage.getItem('peachi.nightCleared');
+  } catch { return false; }
+}
 function restartAnim(node, cls) {
   node.classList.remove(cls);
   void node.offsetWidth;
@@ -117,20 +125,25 @@ function buildSettings(parent) {
   return form;
 }
 function buildHowto(parent) {
-  el('p', 'ptext', parent, 'คืนฮาโลวีน พีชชี่ลืมปิดไลฟ์แล้วเผลอหลับ ตื่นมาอีกทีกลายเป็นผีติดอยู่ในไลฟ์ของตัวเอง คุณคือมอดมือใหม่ที่ถูกเรียกมาตอนตีสาม');
-  el('p', 'ptext', parent, 'หาหูฟังหูแมวที่หายไปในบ้าน แล้วเอาไปวางคืนที่โต๊ะสตรีมก่อนหกโมงเช้า ถ้าพีชชี่เหงานานๆ เธอจะเริ่มโกรธและไล่ตามคุณ');
+  el('p', 'ptext', parent, 'คืนก่อนฮาโลวีน พีชชี่เปิดไลฟ์มาราธอนแล้วเผลอหลับ บอทมอดของเธอไม่ยอมให้ไลฟ์จบ จนเธอกลายเป็นผีติดอยู่ในไลฟ์ของตัวเอง คุณคือมอดมือใหม่ที่ถูกเรียกมาตอนเที่ยงคืน');
+  el('p', 'ptext', parent, 'หาหูฟังหูแมวที่หายไปในบ้าน แล้วเอาไปวางคืนที่โต๊ะสตรีมก่อนหกโมงเช้า พีชชี่จะขอโน่นขอนี่เป็นระยะ ทำให้ทันเธอจะอารมณ์ดี ถ้าปล่อยให้เหงานานๆ เธอจะโกรธและไล่ตามคุณ');
   const grid = el('div', 'keys', parent);
-  for (const [k, v] of [['W A S D', 'เดิน'], ['Shift', 'วิ่ง'], ['เมาส์', 'มองรอบๆ'], ['E', 'หยิบ / วาง'], ['F', 'ไฟฉาย (แบตหมดได้)'], ['Space รัวๆ', 'กรี๊ดไล่ผี'], ['Q', 'แบนแชตผี'], ['Esc', 'พักเกม']]) {
+  for (const [k, v] of [['W A S D', 'เดิน'], ['Shift', 'วิ่ง'], ['เมาส์', 'มองรอบๆ'], ['E', 'หยิบ / ประตู / สวิตช์ / ซ่อน'], ['F', 'ไฟฉาย (แบตหมดได้)'], ['Space รัวๆ', 'กรี๊ดไล่ผี'], ['Space ค้าง', 'กลั้นหายใจตอนซ่อน'], ['Q', 'แบนแชตผี'], ['Esc', 'พักเกม']]) {
     const r = el('div', 'krow', grid); el('kbd', null, r, k); el('span', null, r, v);
   }
-  el('p', 'pnote', parent, 'ถ้าอนุญาตไมค์ ตะโกนใส่ไมค์ได้เลย ระยะไม่เกิน 7 เมตร พีชชี่จะชะงักและถอยไป ส่องไฟฉายใส่ตอนเธอโกรธจะช่วยให้เธอช้าลง แนะนำให้ใส่หูฟัง');
+  el('p', 'pnote', parent, 'ถ้าอนุญาตไมค์ ตะโกนใส่ไมค์ได้เลย ระยะไม่เกิน 7 เมตร พีชชี่จะชะงักและถอยไป แต่ตอนซ่อนต้องเงียบนะ ส่องไฟฉายใส่ตอนเธอโกรธจะช่วยให้เธอช้าลง แนะนำให้ใส่หูฟัง');
 }
 function buildCredits(parent) {
   const sec = (h, lines) => { el('div', 'chead', parent, h); for (const l of lines) el('div', 'cline', parent, l); };
+  const by = el('div', 'cby', parent);
+  el('div', 'cby-label', by, 'ทำโดย');
+  el('div', 'cby-name', by, 'Master Tankhun');
+  el('div', 'cby-sub', by, 'Master Tankhun | Tankhun Gaming');
   sec('ตัวละคร', ['PeachiView  —  youtube.com/@PeachiView249']);
   sec('เกมนี้', ['แฟนเกมที่ทำขึ้นเพื่อฉลองฮาโลวีน ไม่ใช่ผลงานทางการของช่อง', 'โมเดล ฉาก และเสียงทั้งหมดสร้างด้วยโค้ด']);
   sec('เครื่องมือ', ['three.js', 'ฟอนต์ Kanit, Mitr และ Sriracha (SIL Open Font License)', 'เสียงสังเคราะห์ด้วย Web Audio']);
-  sec('ขอบคุณ', ['ผู้ชมทุกคนที่ยังไม่หลับตอนตีสาม', 'มอดทุกคนที่ทำงานฟรี']);
+  sec('ขอบคุณ', ['ลูกพีชน้อยทุกคน', 'มอดทุกคนที่ทำงานฟรี']);
+  el('p', 'pnote', parent, 'แฟนเกมไม่เป็นทางการ ภาพลักษณ์ตัวละครเป็นของ PeachiView');
 }
 
 // ------------------------------------------------------------------ screens
@@ -194,20 +207,63 @@ function buildPause() {
 }
 function buildIntro() {
   const s = el('div', 'screen screen-intro');
+  E.introDate = el('div', 'intro-date', s, '');
   E.introClock = el('div', 'intro-clock tnum', s, '00:00');
   E.introTitle = el('div', 'intro-title', s, 'คืนที่ 1');
   E.introText = el('div', 'intro-text', s, '');
+  E.introStory = el('div', 'intro-story', s);
   return s;
+}
+function buildDM() {
+  // the prologue opens on a phone: a DM from Peachi's account, 23:58
+  const s = el('div', 'screen screen-dm');
+  const phone = el('div', 'phone', s);
+  const bar = el('div', 'phone-bar', phone);
+  E.dmTime = el('span', 'tnum', bar, '23:58');
+  el('span', null, bar, '5G  ▮▮▮');
+  const head = el('div', 'phone-head', phone);
+  el('div', 'phone-ava', head);
+  const hn = el('div', 'phone-hn', head);
+  E.dmName = el('div', 'phone-name', hn, 'PeachiView');
+  el('div', 'phone-status', hn, 'กำลังไลฟ์อยู่');
+  E.dmList = el('div', 'phone-list', phone);
+  E.dmActions = el('div', 'phone-actions', s);
+  return s;
+}
+function buildHideOverlay(parent) {
+  const h = el('div', 'hide', parent);
+  el('div', 'hide-slit', h);
+  const b = el('div', 'hide-ui', h);
+  E.hideHint = el('div', 'hide-hint', b, '');
+  const bar = el('div', 'hide-bar', b);
+  E.hideFill = el('div', 'hide-fill', bar);
+  el('div', 'hide-label', b, 'ลมหายใจ');
+  E.hide = h;
+  return h;
+}
+function buildKeyhole(parent) {
+  const k = html('div', 'keyhole', parent, `<svg viewBox="0 0 400 400" aria-hidden="true">
+    <defs><radialGradient id="kh-iris" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#1a0c06"/><stop offset=".35" stop-color="#6b3a1a"/><stop offset=".8" stop-color="#b4702c"/><stop offset="1" stop-color="#3a1a0a"/></radialGradient>
+    <radialGradient id="kh-white" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#f4ece4"/><stop offset=".75" stop-color="#d8c4bc"/><stop offset="1" stop-color="#8a5a5a"/></radialGradient>
+    <clipPath id="kh-clip"><circle cx="200" cy="150" r="80"/><path d="M160 190 L240 190 L275 360 L125 360 Z"/></clipPath></defs>
+    <g clip-path="url(#kh-clip)"><rect width="400" height="400" fill="#120406"/>
+    <ellipse class="kh-eye" cx="200" cy="175" rx="150" ry="95" fill="url(#kh-white)"/>
+    <path d="M60 170 C 110 150 130 190 170 176 M250 190 C 290 200 300 160 350 180 M120 230 C 150 215 170 240 190 226" stroke="#b02a2a" stroke-width="2" fill="none" opacity=".7"/>
+    <circle class="kh-iris" cx="200" cy="172" r="58" fill="url(#kh-iris)"/><circle class="kh-iris" cx="200" cy="172" r="24" fill="#050202"/>
+    <circle cx="182" cy="152" r="9" fill="#fff" opacity=".85"/></g></svg>`);
+  E.keyhole = k;
+  return k;
 }
 function buildEnd(kind) {
   const s = el('div', `screen screen-end screen-${kind}`);
   el('div', 'end-shade', s);
   const card = el('div', 'paper end-card', s);
-  el('div', 'stamp', card, kind === 'win' ? 'รอดแล้ว' : 'ไลฟ์จบ');
+  const stamp = el('div', 'stamp', card, kind === 'win' ? 'รอดแล้ว' : 'ไลฟ์จบ');
   const title = el('h2', 'paper-title', card, '');
   const text = el('p', 'paper-text', card, '');
+  const stats = el('div', 'end-stats', card);
   const list = menuList(card, [['retry', kind === 'win' ? 'เล่นอีกครั้ง' : 'ลองอีกครั้ง'], ['home', 'กลับหน้าแรก']], (id) => fire(id === 'retry' ? 'retry' : 'home'));
-  E[kind] = { title, text, list };
+  E[kind] = { title, text, list, stamp, stats, retryLabel: list.btns[0].querySelector('.mitem-label') };
   return s;
 }
 
@@ -233,6 +289,13 @@ function buildHud(parent) {
   el('span', 'obj-tag', E.objective, 'ภารกิจ');
   E.objText = el('span', 'obj-text', E.objective, '');
   E.objective.hidden = true;
+  E.req = el('div', 'req', tc);
+  E.reqWho = el('span', 'req-who', E.req, 'พีชชี่ขอ');
+  E.reqText = el('span', 'req-text', E.req, '');
+  E.reqTime = el('span', 'req-time tnum', E.req, '');
+  E.reqBar = el('div', 'req-bar', E.req);
+  E.reqFill = el('div', 'req-fill', E.reqBar);
+  E.req.hidden = true;
   E.toasts = el('div', 'toasts', tc);
   // top-right: live + viewers, chat
   const tr = el('div', 'hud-tr', hud);
@@ -242,6 +305,7 @@ function buildHud(parent) {
   html('span', 'ico', vw, ICON.eye);
   E.viewers = el('span', 'viewers-n tnum', vw, '0');
   E.viewersDelta = el('span', 'viewers-deltas', vw);
+  E.uptime = el('div', 'uptime tnum', tr, '');
   const chat = el('div', 'chat', tr);
   const ch = el('div', 'chat-head', chat);
   html('span', 'ico', ch, ICON.chat);
@@ -280,9 +344,16 @@ function build() {
   root = el('div', 'pv-root');
   root.dataset.screen = 'none';
   E.vignette = el('div', 'fx-vignette', root);
+  buildHideOverlay(root);
   E.flash = el('div', 'fx-flash', root);
   E.hud = buildHud(root);
-  E.screens = { menu: buildMenu(), pause: buildPause(), intro: buildIntro(), gameover: buildEnd('gameover'), win: buildEnd('win') };
+  E.bars = el('div', 'fx-bars', root);
+  el('div', 'fx-bar top', E.bars); el('div', 'fx-bar bottom', E.bars);
+  E.skip = el('div', 'fx-skip', root);
+  el('kbd', null, E.skip, 'Enter'); el('span', null, E.skip, 'ข้าม');
+  buildKeyhole(root);
+  E.black = el('div', 'fx-black', root);
+  E.screens = { menu: buildMenu(), pause: buildPause(), intro: buildIntro(), dm: buildDM(), gameover: buildEnd('gameover'), win: buildEnd('win') };
   for (const s of Object.values(E.screens)) root.appendChild(s);
   return root;
 }
@@ -297,7 +368,7 @@ function onKey(e) {
     if (['ArrowRight', 'ArrowDown', 'KeyD', 'KeyS'].includes(e.code)) { e.preventDefault(); menuKeys.move(1); } else if (['ArrowLeft', 'ArrowUp', 'KeyA', 'KeyW'].includes(e.code)) { e.preventDefault(); menuKeys.move(-1); } else if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') { e.preventDefault(); menuKeys.pick(); }
     return;
   }
-  const list = scr === 'pause' ? E.pauseList : scr === 'gameover' ? E.gameover.list : scr === 'win' ? E.win.list : null;
+  const list = scr === 'pause' ? E.pauseList : scr === 'gameover' ? E.gameover.list : scr === 'win' ? E.win.list : scr === 'dm' ? E.dmMenu : null;
   if (!list) return;
   const panelOpen = (scr === 'menu' && menuPanel) || (scr === 'pause' && pausePanel);
   if (e.code === 'Escape') {
@@ -344,7 +415,7 @@ export const UI = {
     if (root) return;
     const host = document.getElementById('hud') || document.body;
     host.appendChild(build());
-    try { if (localStorage.getItem('peachi.nightCleared')) E.menuCleared.hidden = false; } catch {}
+    E.menuCleared.hidden = !clearedNight1();
     window.addEventListener('keydown', onKey);
     requestAnimationFrame(loop);
     this.showScreen('menu');
@@ -378,20 +449,107 @@ export const UI = {
     if (document.activeElement && root.contains(document.activeElement)) document.activeElement.blur();
     if (name === 'menu') {
       closePanel('menu'); menuBusy = false;
-      try { E.menuCleared.hidden = !localStorage.getItem('peachi.nightCleared'); } catch {}
+      E.menuCleared.hidden = !clearedNight1();
     } else if (name === 'pause') {
       closePanel('pause'); E.pauseList.reset();
     } else if (name === 'intro') {
       E.introTitle.textContent = data.title || 'คืนที่ 1';
       E.introClock.textContent = data.clock || '00:00';
       E.introText.textContent = data.text || '';
+      E.introDate.textContent = data.date || '';
+      E.introStory.replaceChildren();
+      (data.story || []).forEach((line, i) => { const l = el('div', 'intro-line', E.introStory, line); l.style.animationDelay = `${0.9 + i * 1.5}s`; });
     } else if (name === 'gameover' || name === 'win') {
       const d = E[name];
       d.title.textContent = data.title || (name === 'win' ? 'รอดคืนที่ 1' : 'ไลฟ์จบแล้ว');
       d.text.textContent = data.text || '';
+      d.stamp.textContent = data.stamp || (name === 'win' ? 'รอดแล้ว' : 'ไลฟ์จบ');
+      d.retryLabel.textContent = data.retry || (name === 'win' ? 'เล่นอีกครั้ง' : 'ลองอีกครั้ง');
+      d.stats.replaceChildren();
+      for (const [k, v] of data.stats || []) { const r = el('div', 'end-stat', d.stats); el('span', null, r, k); el('b', 'tnum', r, String(v)); }
       d.list.reset();
     }
     if (name !== 'play') this.setPrompt(null);
+  },
+
+  /**
+   * Phone DM (prologue). messages: [{ from: 'them'|'me'|'sys', text, delay }], actions: [[id, label], …].
+   * Resolves with the chosen action id.
+   */
+  showDM({ name = 'PeachiView', time = '23:58', messages = [], actions = [['go', 'ไปบ้านพีชชี่']] } = {}) {
+    if (!root) return Promise.resolve(actions[0][0]);
+    this.showScreen('dm');
+    E.dmName.textContent = name; E.dmTime.textContent = time;
+    E.dmList.replaceChildren(); E.dmActions.replaceChildren();
+    return new Promise((resolve) => {
+      let t = 400;
+      for (const m of messages) {
+        t += m.delay ?? 900;
+        setTimeout(() => {
+          if (currentScreen !== 'dm') return;
+          el('div', `bubble bubble-${m.from || 'them'}${m.glitch ? ' bubble-glitch' : ''}`, E.dmList, m.text);
+          E.dmList.scrollTop = E.dmList.scrollHeight;
+          if (m.from !== 'me') sound('dm');
+        }, t);
+      }
+      setTimeout(() => {
+        if (currentScreen !== 'dm') return;
+        const card = el('div', 'dm-card', E.dmActions);
+        E.dmMenu = menuList(card, actions, (id) => { E.dmMenu = null; resolve(id); });
+      }, t + 700);
+    });
+  },
+
+  /** Hide overlay: null to remove, or { slit: 'h'|'v', breath: 0..1, hint, danger } */
+  setHide(st) {
+    if (!root) return;
+    if (!st) { E.hide.classList.remove('on', 'danger', 'slit-h', 'slit-v'); return; }
+    E.hide.classList.add('on');
+    E.hide.classList.toggle('slit-h', st.slit === 'h');
+    E.hide.classList.toggle('slit-v', st.slit !== 'h');
+    E.hide.classList.toggle('danger', !!st.danger);
+    E.hideFill.style.width = `${Math.round(Math.max(0, Math.min(1, st.breath ?? 1)) * 100)}%`;
+    if (E.hideHint.textContent !== (st.hint || '')) E.hideHint.textContent = st.hint || '';
+  },
+
+  /** Peek through the locked door's keyhole: an eye looks back. */
+  keyhole(ms = 1600) {
+    if (!root) return;
+    restartAnim(E.keyhole, 'on');
+    clearTimeout(E.keyhole._t);
+    E.keyhole._t = setTimeout(() => E.keyhole.classList.remove('on'), ms);
+  },
+
+  /** Black overlay: v 0..1 over ms. Resolves when done. */
+  fade(v, ms = 600) {
+    if (!root) return Promise.resolve();
+    E.black.style.transitionDuration = `${ms}ms`;
+    E.black.style.opacity = String(v);
+    clearTimeout(fadeTimer);
+    return new Promise((r) => { fadeTimer = setTimeout(r, ms); });
+  },
+  letterbox(on) { if (root) root.classList.toggle('cine', !!on); },
+  skipHint(on) { if (root) E.skip.classList.toggle('on', !!on); },
+  /** 'full' | 'prologue' (clock, objective and toasts only) | 'cine' (nothing) */
+  setHudMode(mode) { if (root) root.dataset.hud = mode || 'full'; },
+  setNight(label) { if (root) E.night.textContent = label; },
+  setUptime(sec) {
+    if (!root) return;
+    if (sec == null) { E.uptime.textContent = ''; return; }
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = Math.floor(sec % 60);
+    const txt = `ไลฟ์มาแล้ว ${h}:${pad(m)}:${pad(x)}`;
+    if (E.uptime.textContent !== txt) E.uptime.textContent = txt;
+  },
+  /** Peachi's current request: null, or { text, left (s), frac (0..1 progress), hint } */
+  setRequest(r) {
+    if (!root) return;
+    if (!r) { if (!E.req.hidden) { E.req.hidden = true; E.req._t = null; } return; }
+    if (E.req.hidden || E.req._t !== r.text) { E.req._t = r.text; E.reqText.textContent = r.text; E.req.hidden = false; restartAnim(E.req, 'pop'); }
+    const left = Math.max(0, Math.ceil(r.left || 0));
+    E.reqTime.textContent = `${Math.floor(left / 60)}:${pad(left % 60)}`;
+    E.req.classList.toggle('urgent', left <= 10);
+    E.reqFill.style.width = `${Math.round(Math.max(0, Math.min(1, r.frac || 0)) * 100)}%`;
+    E.reqBar.hidden = !(r.frac > 0);
   },
 
   setClock(hour, minute = 0) {
@@ -399,7 +557,8 @@ export const UI = {
     const txt = `${pad(hour)}:${pad(minute)}`;
     if (E.clock.textContent !== txt) {
       E.clock.textContent = txt;
-      E.clock.closest('.clock').classList.toggle('dawn', hour >= 5);
+      E.clock.closest('.clock').classList.toggle('dawn', hour >= 5 && hour < 12);
+      E.clock.nextSibling.textContent = hour < 12 ? 'AM' : '';
     }
   },
 
@@ -490,12 +649,14 @@ export const UI = {
     setTimeout(() => t.remove(), 3100);
   },
 
-  subtitle(text, ms = 3000) {
+  /** opts: { name = 'พีชชี่', cls } — cls styles the line ('bot', 'broken', 'her', 'me') */
+  subtitle(text, ms = 3000, opts = {}) {
     if (!root) return;
     clearTimeout(subTimer); clearInterval(subType);
     if (!text) { E.subtitle.hidden = true; return; }
     E.subtitle.replaceChildren();
-    el('span', 'sub-name', E.subtitle, 'พีชชี่');
+    E.subtitle.className = 'subtitle' + (opts.cls ? ' ' + opts.cls.split(' ').map((c) => 'sub-' + c).join(' ') : '');
+    el('span', 'sub-name', E.subtitle, opts.name ?? 'พีชชี่');
     const body = el('span', 'sub-text', E.subtitle, '');
     E.subtitle.hidden = false;
     restartAnim(E.subtitle, 'in');
@@ -510,9 +671,12 @@ export const UI = {
   },
 
   chat: {
+    /** type: 'normal' | 'spam' | 'superchat' | 'bot' (PeachiBot) | 'her' ("เธอ": looks like spam, can't be banned) */
     push({ user = '???', text = '', type = 'normal', amount = 0 } = {}) {
       if (!root) return null;
-      const line = el('div', `chat-msg chat-${type}`);
+      const her = type === 'her';
+      if (her) type = 'spam';
+      const line = el('div', `chat-msg chat-${type}${her ? ' chat-her' : ''}`);
       if (type === 'superchat') {
         line.classList.add(scTier(amount));
         const head = el('div', 'sc-head', line);
@@ -520,8 +684,9 @@ export const UI = {
         el('span', 'sc-amount tnum', head, `฿${fmt(amount)}`);
         el('div', 'sc-text', line, text);
       } else {
+        if (type === 'bot') html('span', 'chat-badge', line, 'บอท');
         const u = el('span', 'chat-user', line, user);
-        if (type !== 'spam') u.style.color = userColor(user);
+        if (type !== 'spam' && type !== 'bot') u.style.color = userColor(user);
         el('span', 'chat-text', line, text);
         if (type === 'spam') {
           const timer = el('div', 'spam-timer', line);
@@ -529,17 +694,24 @@ export const UI = {
         }
       }
       E.chatList.appendChild(line);
-      const m = { el: line, type, t0: now(), banned: false };
+      const m = { el: line, type, t0: now(), banned: false, her, user, text };
       chatMsgs.push(m);
       trimChat();
       if (type === 'spam') updateSpamCount();
       E.chatList.scrollTop = E.chatList.scrollHeight;
       return line;
     },
+    /** true = banned, 'refused' = it was "เธอ" (she comes right back), false = nothing to ban */
     banOldestSpam() {
       if (!root) return false;
       const m = chatMsgs.find((x) => x.type === 'spam' && !x.banned);
       if (!m) return false;
+      if (m.her) {
+        m.el.classList.add('refused');
+        setTimeout(() => { removeMsg(m); updateSpamCount(); UI.chat.push({ user: m.user, text: 'แบนฉันไม่ได้หรอก', type: 'her' }); }, 650);
+        m.banned = true;
+        return 'refused';
+      }
       m.banned = true;
       m.el.classList.add('banned');
       el('span', 'ban-stamp', m.el, 'แบนแล้ว');
@@ -549,13 +721,13 @@ export const UI = {
     },
     spamAges() {
       const t = now();
-      return chatMsgs.filter((m) => m.type === 'spam' && !m.banned).map((m) => (t - m.t0) / 1000);
+      return chatMsgs.filter((m) => m.type === 'spam' && !m.banned && !m.her).map((m) => (t - m.t0) / 1000);
     },
     expireSpam(maxAge = SPAM_TTL_HINT) {
       const t = now();
       let n = 0;
       for (const m of chatMsgs.slice()) {
-        if (m.type === 'spam' && !m.banned && (t - m.t0) / 1000 > maxAge) {
+        if (m.type === 'spam' && !m.banned && !m.her && (t - m.t0) / 1000 > maxAge) {
           m.banned = true; m.el.classList.add('expired');
           setTimeout(() => removeMsg(m), 600);
           n++;

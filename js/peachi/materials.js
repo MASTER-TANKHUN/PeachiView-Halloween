@@ -28,6 +28,7 @@ export function createUniforms(ghost) {
     uLining: { value: new THREE.Color(0xff8dbd) },
     uRimK: { value: 0.3 },
     uDark: { value: 0 },   // 1 = pitch-black silhouette (the title screen's split-second scare)
+    uDesat: { value: 0 },  // 1 = colors drained to a cold grey (the story gives them back)
     // face SDF shading (filled in by the model)
     uFaceSDF: { value: null },
     uFaceWin: { value: new THREE.Vector4(-0.085, 0, 0.085, 0.17) }, // head-local x0, y0, x1, y1
@@ -60,7 +61,7 @@ if (aSway.x > 0.0) {
 const FADE_PARS = /* glsl */`
 varying vec3 vGWorld;
 varying vec3 vLocalP;
-uniform float uGhost, uGlow, uBaseY, uTime, uSelfLit, uRimK, uDark;
+uniform float uGhost, uGlow, uBaseY, uTime, uSelfLit, uRimK, uDark, uDesat;
 uniform vec2 uFade;
 uniform vec3 uGlowColor;
 float pvIGN(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
@@ -213,6 +214,7 @@ export function toonMaterial(U, params = {}, flags = {}) {
           float facing = dot(pvHeadFwd(), normalize(vViewPosition));
           gl_FragColor.a *= 0.8 * smoothstep(0.5, 0.82, facing);
         }` : ''}
+        { float lum = dot(gl_FragColor.rgb, vec3(0.3, 0.55, 0.15)); gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(lum * 0.86, lum * 0.93, lum * 1.12), uDesat); }
         gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.006, 0.003, 0.01), uDark);`);
   };
   const key = `peachi-toon4-${[holo, lining, rim, crisp, strands, faceSDF, eyeOverlay].map(Number).join('')}`;
@@ -226,7 +228,7 @@ export function outlineMaterial(U, { px = 1.7, max = 0.006 } = {}) {
     uOutlinePx: { value: px },
     uOutlineMax: { value: max },
   }]);
-  for (const k of ['uTime', 'uGhost', 'uGlow', 'uBaseY', 'uFade', 'uGlowColor', 'uFlare', 'uSwayK', 'uSelfLit', 'uRimK', 'uDark']) uniforms[k] = U[k];
+  for (const k of ['uTime', 'uGhost', 'uGlow', 'uBaseY', 'uFade', 'uGlowColor', 'uFlare', 'uSwayK', 'uSelfLit', 'uRimK', 'uDark', 'uDesat']) uniforms[k] = U[k];
   return new THREE.ShaderMaterial({
     uniforms,
     side: THREE.BackSide,
