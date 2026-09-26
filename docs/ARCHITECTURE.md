@@ -136,6 +136,7 @@ js/ghosts/pop.js        Phi Pop: hunger, snacks, red soda, hunt, bashes doors do
 js/ghosts/fake.js       the fake Peachi (second Peachi model): mimic, lure, lunge; black in mirrors/photos
 js/ghosts/mannequin.js  the mannequin that moves when unseen (cameo)
 js/systems/redlight.js  red light, green light in the hall
+js/systems/minigames.js in-night mini-games: POPCAT, dance (Simon), karaoke (TV + beat lane), spirit board
 js/world/waiting.js     the Room of Waiting set dressing (tallies, calendar, notes, music box)
 js/world/choker.js      the heart choker and its three pieces
 js/data/chat.js story.js   Thai text

@@ -98,7 +98,6 @@ export class Night3 extends NightBase {
     this.soda = { stock: 3, held: false, onShrine: false };
     this.snacks.count = SNACKS;
     this.strapOut = false;
-    this.reqTimer = 999;
     this.thunderT = rand(8, 16);
     this.rlDone = false; this.rlWant = false;
     this.teased = false;
@@ -234,6 +233,18 @@ export class Night3 extends NightBase {
     try { ambient.setRain(0); } catch (e) { /* no audio */ }
   }
 
+  requestPool() { return ['hungry', 'lonely', 'dark', 'karaoke', 'dance', 'popcat', 'photo']; }
+  requestAllowed(k) { return k !== 'hungry' || this.snacks.count > 0; } // her snacks come off the same rack
+  requestsPaused() { return this.redlight.active; }
+  get karaokeSong() { return 'halloween'; }
+  canPray() { return !this.soda.held; } // with red soda in hand, the shrine is for Phi Pop
+  boardAnswer() {
+    if (this.pieces.pendant === 'hidden') return { letters: ['ก', 'ร', 'จ', 'ก'], reading: 'กระจก' };
+    if (this.pieces.strap === 'inside') return { letters: ['ศ', 'ล'], reading: 'ศาล… (น้ำแดง?)' };
+    if (this.pieces.lock === 'box') return { letters: ['ข', 'ก'], reading: 'แขก… ห้องแขก' };
+    return { letters: ['ใช่', 'ลาก่อน'], reading: 'ใช่… ลาก่อน' };
+  }
+
   inSafeRoom() { return this.waiting.shown && this.level.roomAt(this.player.position) === 'bedroom'; }
   otherJumpscare() { return this.pop.state === 'jumpscare' || this.fake.state === 'lunge'; }
   jumpscareUpdate(dt, t) {
@@ -332,14 +343,6 @@ export class Night3 extends NightBase {
     const r = this.redlight.update(dt);
     if (r) this._redLightDone(r);
 
-    // requests (her hungry request eats from the same rack)
-    this.reqTimer -= dt;
-    if (this.reqTimer <= 0 && !this.requests.active && !this.peachi.isAngry && !this.hide.hidden && !this.redlight.active) {
-      const kinds = ['hungry', 'lonely', 'dark'].filter((k) => k !== this.lastReq && (k !== 'hungry' || this.snacks.count > 0));
-      const k = pick(kinds);
-      if (this.requests.start(k)) this.lastReq = k;
-      this.reqTimer = rand(70, 90);
-    }
 
     // rain + lightning
     this.thunderT -= dt;

@@ -21,6 +21,8 @@ export const randInt = (a, b) => Math.floor(rand(a, b + 1));
 
 const HYPE_USERS = ['ลูกพีชน้อย_249', 'mod_ตัวจริง', 'peachlover', 'คนดูเงียบๆ', 'นอนไม่หลับ', 'ลูกพีชซ่า', 'ลุงป้อม_สายเปย์'];
 const TENSION_CHAT = ['ข้างหลัง!!!', 'วิ่งงงงงง', 'มอดใหม่จะรอดมั้ย 555', 'ตะโกนใส่เลยมอด!!', 'ไฟฉาย! ส่องหน้าเลย', 'ใจเต้นแรงมากก'];
+const ROOM_TH = { stream: 'ห้องสตรีม', kitchen: 'ครัว', living: 'ห้องนั่งเล่น', bathroom: 'ห้องน้ำ', hallway: 'โถงทางเดิน', bedroom: 'ห้องแขก' };
+const POLL_QUESTIONS = ['โพล: ให้มอดไปห้องไหนดี?', 'โพล: ห้องไหนน่ากลัวที่สุด ไปดูหน่อย!', 'โพล: มอดต้องไปตรวจห้องไหน?'];
 const SLEEPY_CHAT = ['มอดหลับเหรอ', 'ซ่อนนานไปแล้วว ออกมาทำคอนเทนต์!', 'จอดำ 20 วิ ใครเอาไลฟ์ไปทำอะไร', 'มอดนอนในตู้ป่ะเนี่ย'];
 
 export class NightBase {
@@ -44,7 +46,7 @@ export class NightBase {
   get speed() { return Number(this.params?.get('speed')) || 1; }
   get god() { return this.params?.get('god') === '1'; }
   /** Space is taken by something else right now (the breaker QTE): no screaming. */
-  get inputLock() { return !!(this.power && this.power.busy); }
+  get inputLock() { return !!((this.power && this.power.busy) || (this.games && this.games.busy)); }
 
   _resetVars() {
     this.time = 0;
@@ -70,7 +72,11 @@ export class NightBase {
     this.caughtReason = 'caught';
     this.boredT = 0;
     this.stats = { screams: 0, bans: 0, requests: 0, maxViewers: START_VIEWERS, hides: 0, closeCalls: 0, photos: 0, bestPhoto: 0 };
-    this.missions = []; // super-chat missions: { id, text, sub, left, reward, photo: subject kind, done }
+    this.missions = []; // super-chat missions: { id, text, sub, left, reward, photo: subject kind, room, done }
+    this.reqTimer = 999;  // Peachi's next request (the night starts the clock)
+    this.lastReq = null;
+    this.pollT = 999; this.poll = null;
+    this.boardUsed = false; this.prayed = false; this.karaokeDone = false;
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -103,6 +109,7 @@ export class NightBase {
     if (this.phone) { this.phone.reset(); this.phone.provider = this; }
     if (this.power) this.power.reset();
     if (this.memes) this.memes.attach(this);
+    if (this.games) this.games.stop(true);
     this.requests.onResult = (kind, ok, why) => this._onRequest(kind, ok, why);
     this.hide.onEnter = () => { this.hideT = 0; this.searchedThisHide = false; this.sleepyChatDone = false; this.stats.hides++; this.hideSeenDist = peachi.distToPlayer; };
     this.hide.onExit = () => { if (peachi.state === 'search') { peachi.search = null; peachi.state = 'roam'; } };
@@ -127,6 +134,7 @@ export class NightBase {
     this.state = 'play';
     this.paused = false;
     this.onStart();
+    this._attachExtras(); // after onStart: the night's own items decide where batteries can't go
     for (const ev of this.events) if (ev.at < this.hour) ev.done = true;
   }
 
@@ -156,6 +164,8 @@ export class NightBase {
 
   _end() {
     if (this.memes) this.memes.close();
+    if (this.games) this.games.stop(true);
+    if (this.poll) { this.poll.close(-1); this.poll = null; }
     if (this.power) this.power.close(true);
     if (this.phone) { this.phone.close(); this.phone.lower(); }
     this.hide.reset();
@@ -265,6 +275,7 @@ export class NightBase {
         UI.toast(`ภารกิจสำเร็จ! +${m.reward || 25} ผู้ชม`);
       }
     }
+    this.requests.onPhoto(photo);
     this.onPhotoTaken(photo);
   }
   onPhotoTaken() {}
@@ -279,10 +290,153 @@ export class NightBase {
   _updateMissions(dt) {
     for (const m of this.missions) {
       if (m.done || m.failed) continue;
+      if (m.room && this.level.roomAt(this.player.position) === m.room) {
+        m.done = true;
+        this._addViewers(m.reward || 15);
+        if (this.player.flashlight) this.player.flashlight.battery = Math.min(100, this.player.flashlight.battery + 15);
+        sfx.play('superchat');
+        this.chat(pick(HYPE_USERS), pick(['มอดทำตามโพลด้วย น่ารัก', 'โพลชนะ!!', 'ไปตามที่แชตขอจริงๆ 555']));
+        UI.toast(`ทำตามโพลแล้ว! +${m.reward || 15} ผู้ชม · แบต +15%`);
+        continue;
+      }
       m.left -= dt;
       if (m.left <= 0) { m.failed = true; m.done = false; this.chat(m.user || 'ลูกพีชน้อย_249', 'ไม่เป็นไรค่ะ… ไว้คราวหน้า'); }
     }
     this.missions = this.missions.filter((m) => !m.failed && !(m.done && (m.shownDone = (m.shownDone || 0) + dt) > 8));
+  }
+
+
+  // ---------------------------------------------------------------- things every night has
+  // mini-games at their spots, three spare batteries, the spirit house, the spirit board
+  _attachExtras() {
+    const { level, player, peachi, requests, games } = this;
+    const inRoom = (r) => level.roomAt(player.position) === r;
+    const want = (k) => requests.active && requests.active.kind === k;
+    if (games) {
+      games.onDone = null;
+      this.interact({ position: new THREE.Vector3(-5.73, 1.0, -6.3), radius: 1.5, label: '[E] เล่น POPCAT (พีชชี่ขอ)',
+        onUse: () => games.popcat((ok) => { requests.complete('popcat', ok); if (ok) this._addViewers(randInt(8, 14)); else UI.toast('ยังไม่ถึง 80 ที ลองใหม่ได้'); }),
+        enabled: () => this.state === 'play' && want('popcat') && !games.active && inRoom('stream') });
+      this.interact({ position: () => new THREE.Vector3(peachi.position.x, 1.0, peachi.position.z), radius: 3.2, label: '[E] เต้นตามพีชชี่',
+        onUse: () => { peachi.group.rotation.y = Math.atan2(player.position.x - peachi.position.x, player.position.z - peachi.position.z); games.dance(peachi, (ok) => { requests.complete('dance', ok); if (ok) this._addViewers(randInt(12, 20)); }); },
+        enabled: () => this.state === 'play' && want('dance') && !games.active && !peachi.isAngry && peachi.group.visible });
+      this.interact({ position: new THREE.Vector3(9.05, 1.0, 4.1), radius: 1.7,
+        label: () => (want('karaoke') ? '[E] ร้องคาราโอเกะ (พีชชี่ขอ)' : '[E] ร้องคาราโอเกะเรียกคนดู (คืนละครั้ง)'),
+        onUse: () => games.karaoke(this.karaokeSong, (ok) => {
+          if (!want('karaoke')) this.karaokeDone = true;
+          requests.complete('karaoke', ok);
+          this._addViewers(ok ? randInt(20, 30) : randInt(3, 6));
+          this.chat(pick(HYPE_USERS), ok ? pick(['เสียงดีมากกก', 'ขอเพลงเต็มด้วย!', 'ร้องเพราะกว่าผีอีก']) : 'คีย์หลุดนิดหน่อย 555');
+        }),
+        enabled: () => this.state === 'play' && !games.active && inRoom('living') && (want('karaoke') || !this.karaokeDone) });
+      this.interact({ position: new THREE.Vector3(6.4, 0.7, 4.35), radius: 1.6, label: '[E] เล่นกระดานวิญญาณ (คืนละครั้ง)',
+        onUse: () => this._spiritBoard(),
+        enabled: () => this.state === 'play' && !this.boardUsed && !games.active && inRoom('living') });
+    }
+    this.interact({ position: new THREE.Vector3(3.64, 1.05, 6.31), radius: 1.7, label: '[E] ไหว้ศาลพระภูมิ (คืนละครั้ง)',
+      onUse: () => this._pray(), enabled: () => this.state === 'play' && !this.prayed && this.canPray() && inRoom('living') });
+    this._placeBatteries();
+  }
+
+  get karaokeSong() { return 'default'; }
+  canPray() { return true; }
+  /** The spirit board's answer: consonants (and ใช่ / ไม่ / ลาก่อน), and what the chat reads it as. */
+  boardAnswer() { return { letters: ['ใช่'], reading: 'ใช่…?' }; }
+
+  _pray() {
+    this.prayed = true;
+    sfx.play('incense');
+    if (this.player.flashlight) this.player.flashlight.battery = 100;
+    Talk.say('her', 'ขอให้รอดนะลูก…', { ms: 2600 });
+    this.chat('แม่นาค_ตัวจริง', 'สาธุ 🙏');
+    UI.toast('ไหว้ศาลแล้ว ไฟฉายเต็มแบต');
+  }
+
+  _spiritBoard() {
+    this.boardUsed = true;
+    const A = this.boardAnswer();
+    this.level.setFlicker(true);
+    setTimeout(() => { if (this.state === 'play' && !this.peachi.isAngry) this.level.setFlicker(false); }, 1500);
+    this.games.board(A.letters, () => {
+      this.chat(pick(HYPE_USERS), `กระดานบอกว่า "${A.reading}"`);
+      this._addViewers(randInt(8, 14));
+      this.peachi.mood = Math.min(100, this.peachi.mood + 8);
+      setTimeout(() => this.state === 'play' && this.peachi.line(pick(['เล่นกระดานผีทำไม พีชชี่ก็ผีนะ ถามพีชชี่ก็ได้!', 'ใครตอบมอดน่ะ… ไม่ใช่พีชชี่นะ', 'กระดานนี้ของยายนะ อย่าเล่นบ่อย'])), 900);
+    });
+  }
+
+  // spare AA batteries lying around (three a night)
+  _placeBatteries() {
+    if (!this._batt) {
+      this._batt = [];
+      const body = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.4, metalness: 0.3, emissive: 0x0a2a0a });
+      const band = new THREE.MeshStandardMaterial({ color: 0x5dff8a, roughness: 0.4, emissive: 0x2a8a3a, emissiveIntensity: 0.8 });
+      for (let i = 0; i < 3; i++) {
+        const g = new THREE.Group();
+        const c = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 12), body); c.rotation.z = Math.PI / 2; g.add(c);
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.0125, 0.0125, 0.018, 12), band); b.rotation.z = Math.PI / 2; b.position.x = 0.012; g.add(b);
+        g.visible = false;
+        this.scene.add(g);
+        this._batt.push(g);
+      }
+    }
+    const taken = this.itemSpotsTaken ? this.itemSpotsTaken() : [];
+    const spots = (this.level.itemSpots || []).filter((s) => !taken.some((t) => t.distanceTo(s) < 0.5) && this.level.roomAt(s) !== 'bedroom').sort(() => Math.random() - 0.5);
+    this._batt.forEach((g, i) => {
+      const s = spots[i];
+      if (!s) { g.visible = false; return; }
+      g.position.set(s.x + 0.12, s.y + 0.015, s.z); g.rotation.y = Math.random() * Math.PI; g.visible = true;
+      this.interact({ position: () => g.position, radius: 1.4, label: '[E] เก็บถ่านไฟฉายสำรอง',
+        onUse: () => { g.visible = false; const fl = this.player.flashlight; if (fl) fl.battery = Math.min(100, fl.battery + 45); sfx.play('battery'); UI.toast('ได้ถ่านสำรอง! แบตไฟฉาย +45%'); },
+        enabled: () => this.state === 'play' && g.visible });
+    });
+  }
+
+  // ---------------------------------------------------------------- Peachi's requests, on a timer
+  requestPool() { return ['hungry', 'dark', 'lonely']; }
+  requestAllowed() { return true; }
+  requestsPaused() { return false; }
+  _updateRequests(dt) {
+    if (this.reqTimer > 900) return;
+    this.reqTimer -= dt;
+    if (this.reqTimer > 0) return;
+    if (this.requests.active || this.peachi.isAngry || this.hide.hidden || (this.games && this.games.active) || this.requestsPaused()) { this.reqTimer = 3; return; }
+    const pool = this.requestPool().filter((k) => k !== this.lastReq && this.requestAllowed(k));
+    const k = pick(pool);
+    if (k && this.requests.start(k)) this.lastReq = k;
+    this.reqTimer = rand(65, 85);
+  }
+
+  // ---------------------------------------------------------------- chat polls: "which room should the mod go to?"
+  _updatePolls(dt) {
+    if (this.hour < 0.6) return;
+    if (this.pollT > 900) this.pollT = rand(20, 40);
+    if (this.poll) {
+      const P = this.poll;
+      P.t += dt;
+      // votes drift, one option pulls ahead
+      for (let i = 0; i < P.v.length; i++) P.v[i] += dt * (P.bias[i] + Math.random() * 2);
+      const sum = P.v.reduce((a, b) => a + b, 0);
+      P.ui.set(P.v.map((x) => x / sum));
+      if (P.t >= 14) {
+        const win = P.v.indexOf(Math.max(...P.v));
+        P.ui.close(win);
+        const room = P.rooms[win];
+        this.missions.push({ id: 'poll', text: `โพล: ไป${ROOM_TH[room]}`, sub: 'แชตโหวตแล้ว', left: 28, reward: 15, room, user: 'โพลแชต', done: false });
+        UI.toast(`แชตโหวตให้ไป${ROOM_TH[room]}! ไปภายใน 28 วิ`);
+        this.poll = null;
+        this.pollT = rand(80, 120);
+      }
+      return;
+    }
+    this.pollT -= dt;
+    if (this.pollT > 0 || this.missions.some((m) => m.room && !m.done)) return;
+    const here = this.level.roomAt(this.player.position);
+    const rooms = ['stream', 'kitchen', 'living', 'bathroom', 'hallway'].filter((r) => r !== here).sort(() => Math.random() - 0.5).slice(0, 3);
+    const q = pick(POLL_QUESTIONS);
+    const ui = UI.chat.pushPoll({ title: q, options: rooms.map((r) => ROOM_TH[r]) });
+    if (!ui) return;
+    this.poll = { t: 0, rooms, v: rooms.map(() => 1), bias: rooms.map(() => Math.random() * 3), ui };
   }
 
   // ---------------------------------------------------------------- input / events
@@ -363,6 +517,9 @@ export class NightBase {
     this._updateHiding(dt);
     if (this.state !== 'play' || peachi.state === 'jumpscare') return;
     this.requests.update(dt);
+    this._updateRequests(dt);
+    this._updatePolls(dt);
+    if (this.games) this.games.update(dt, t);
     this._updateMissions(dt);
     this._updateChat(dt);
     this._updateSpamPenalty();

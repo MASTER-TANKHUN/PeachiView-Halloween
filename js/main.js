@@ -63,7 +63,7 @@ const menu = createMenuScene({ camera, level, peachi, sfx, UI });
 const director = new Director({ scene, camera, renderer, level, player, peachi, menu, params });
 
 const game = { director, peachi, player, level, scene, camera, renderer, UI, Scream, menu, Settings, Save,
-  krasue: director.krasue, phone: director.phone, power: director.power, anomalies: director.anomalies,
+  krasue: director.krasue, phone: director.phone, power: director.power, anomalies: director.anomalies, games: director.games,
   get state() { return director.state; }, get night() { return director.night; }, get paused() { return director.paused; } };
 window.__game = game;
 

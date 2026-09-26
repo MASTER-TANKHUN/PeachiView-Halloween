@@ -769,6 +769,29 @@ export const UI = {
       E.chatList.scrollTop = E.chatList.scrollHeight;
       return line;
     },
+    /** A live poll card: { title, options }. Returns { set(fractions), close(winnerIndex) }. */
+    pushPoll({ title = 'โพล', options = [] } = {}) {
+      if (!root) return null;
+      const line = el('div', 'chat-msg chat-poll');
+      html('span', 'chat-badge poll', line, 'โพล');
+      el('span', 'chat-text', line, title);
+      const rows = options.map((o) => {
+        const r = el('div', 'poll-row', line);
+        const fill = el('div', 'poll-fill', r);
+        el('span', 'poll-label', r, o);
+        const pct = el('span', 'poll-pct tnum', r, '0%');
+        return { r, fill, pct };
+      });
+      E.chatList.appendChild(line);
+      const m = { el: line, type: 'poll', t0: now(), banned: false };
+      chatMsgs.push(m);
+      trimChat();
+      E.chatList.scrollTop = E.chatList.scrollHeight;
+      return {
+        set(fr) { rows.forEach((x, i) => { const p = Math.round((fr[i] || 0) * 100); x.fill.style.width = `${p}%`; x.pct.textContent = `${p}%`; }); },
+        close(win) { line.classList.add('closed'); if (rows[win]) rows[win].r.classList.add('win'); },
+      };
+    },
     /** true = banned, 'refused' = it was "เธอ" (she comes right back), false = nothing to ban */
     banOldestSpam() {
       if (!root) return false;

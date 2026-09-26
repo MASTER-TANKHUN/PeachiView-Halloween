@@ -455,6 +455,15 @@ const recipes = {
   redLight(t) { tone({ type: 'square', freq: 220, t, a: 0.005, hold: 0.25, rel: 0.05, vol: 0.12 }); tone({ type: 'square', freq: 233, t, a: 0.005, hold: 0.25, rel: 0.05, vol: 0.08 }); },
   greenLight(t) { tone({ type: 'sine', freq: 880, t, a: 0.005, rel: 0.12, vol: 0.14 }); tone({ type: 'sine', freq: 1175, t: t + 0.09, a: 0.005, rel: 0.2, vol: 0.14 }); },
   caught(t) { [523, 415, 330].forEach((f, i) => tone({ type: 'triangle', freq: f, t: t + i * 0.12, a: 0.005, rel: 0.15, vol: 0.18 })); },
+  pop(t) { tone({ type: 'sine', freq: [rand(600, 760), 1400], t, a: 0.002, rel: 0.05, vol: 0.2 }); noise({ t, a: 0.001, rel: 0.02, vol: 0.12, filter: 'bandpass', f: 2500, q: 2 }); },
+  danceNote(t, o = {}) { const f = [523, 659, 784, 880][o.i ?? 0]; tone({ type: 'triangle', freq: f, t, a: 0.004, rel: 0.22, vol: 0.18 }); tone({ type: 'sine', freq: f * 2, t, a: 0.004, rel: 0.1, vol: 0.05 }); },
+  karaNote(t, o = {}) { const f = o.f || 660, v = (o.vol ?? 1) * 0.16; tone({ type: 'triangle', freq: f, t, a: 0.005, hold: 0.12, rel: 0.25, vol: v, vib: 6, vibRate: 6 }); tone({ type: 'square', freq: f / 2, t, a: 0.005, hold: 0.08, rel: 0.1, vol: v * 0.25 }); },
+  karaBeat(t) {
+    tone({ type: 'sine', freq: [130, 45], t, a: 0.002, rel: 0.14, vol: 0.4 });
+    noise({ t: t + 0.275, a: 0.001, rel: 0.04, vol: 0.08, filter: 'highpass', f: 7000 });
+  },
+  incense(t) { tone({ type: 'sine', freq: 392, t, a: 0.3, hold: 0.4, rel: 1.4, vol: 0.08 }); tone({ type: 'sine', freq: 587, t: t + 0.15, a: 0.3, hold: 0.3, rel: 1.4, vol: 0.05 }); noise({ t, a: 0.4, hold: 0.3, rel: 0.8, vol: 0.04, filter: 'bandpass', f: 2000, q: 0.8 }); },
+  battery(t) { tone({ type: 'square', freq: 880, t, a: 0.003, rel: 0.05, vol: 0.08 }); tone({ type: 'square', freq: 1320, t: t + 0.07, a: 0.003, rel: 0.08, vol: 0.08 }); },
   giggle(t, o = {}) {
     // cute "hi-hi-hi-hii~"
     const pan = o.pan || 0, v = o.vol ?? 1;

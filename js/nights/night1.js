@@ -17,6 +17,8 @@ const HYPE = ['ลูกพีชน้อย_249', 'peachlover', 'นอนไ�
 const WEBCAM = new THREE.Vector3(-5.73, 1.39, -6.6);
 const MONITOR = new THREE.Vector3(-5.73, 1.153, -6.66);
 const CLOCK = new THREE.Vector3(0.9, 1.5, 0.74); // pendulum clock in the hall
+const BOARD_WORDS = { stream: [['ส', 'ต', 'ร', 'ม'], 'สตรีม'], kitchen: [['ค', 'ร', 'ว'], 'ครัว'], living: [['น', 'ง', 'ล', 'น'], 'นั่งเล่น'], bathroom: [['ห', 'ง', 'น'], 'ห้องน้ำ'], hallway: [['ถ', 'ง'], 'โถง'], bedroom: [['ข', 'ก'], 'แขก'] };
+
 
 export class Night1 extends NightBase {
   get number() { return 1; }
@@ -51,7 +53,6 @@ export class Night1 extends NightBase {
     this.endTried = false;
     this.musicT = 3;
     this.clockT = 0;
-    this.reqTimer = 999;
     this.webcam = null;
 
     // Peachi, before: pale, glowing, no headphones, a broken voice
@@ -90,7 +91,7 @@ export class Night1 extends NightBase {
     this.interact({
       position: new THREE.Vector3(MONITOR.x, 1.0, MONITOR.z + 0.2), radius: 1.5, label: '[E] กดจบไลฟ์',
       onUse: () => this._tryEnd(),
-      enabled: () => this.state === 'play' && !this.carrying && !this.endTried,
+      enabled: () => this.state === 'play' && !this.carrying && !this.endTried && !(this.requests.active && this.requests.active.kind === 'popcat'),
     });
 
     UI.setObjective(OBJ_FIND);
@@ -128,6 +129,14 @@ export class Night1 extends NightBase {
     });
   }
 
+  requestPool() { return ['hungry', 'dark', 'lonely', 'photo', 'popcat', 'dance']; }
+  itemSpotsTaken() { return this.itemSpot ? [this.itemSpot] : []; }
+  boardAnswer() {
+    const room = this.level.roomAt(this.itemSpot) || 'hallway';
+    const [letters, word] = BOARD_WORDS[room] || [['ใช่'], 'ใช่'];
+    return { letters: this.carrying || this.placed ? ['ใช่'] : letters, reading: this.carrying || this.placed ? 'ใช่ (หูฟังอยู่กับมอดแล้ว)' : `หูฟังอยู่ที่${word}` };
+  }
+
   goalRows() { return [{ text: this.carrying ? OBJ_RETURN.replace(/"/g, '') : OBJ_FIND.replace(/"/g, ''), kind: 'goal' }]; }
 
   onAbort() {
@@ -140,14 +149,6 @@ export class Night1 extends NightBase {
 
   onUpdate(dt, t) {
     if (!this.carrying && this.item.userData.update) this.item.userData.update(dt, t);
-    // more requests, whenever she's calm
-    this.reqTimer -= dt;
-    if (this.reqTimer <= 0 && !this.requests.active && !this.peachi.isAngry && !this.hide.hidden) {
-      const kinds = ['dark', 'lonely', 'hungry'].filter((k) => k !== this.lastReq);
-      const k = pick(kinds);
-      if (this.requests.start(k)) this.lastReq = k;
-      this.reqTimer = rand(75, 90);
-    }
     // after 03:00 the clock ticks, and the lost headphones play music you can follow
     if (this.hour >= 3) {
       this.clockT -= dt;

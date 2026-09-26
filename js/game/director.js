@@ -18,6 +18,7 @@ import { Power } from '../systems/power.js';
 import { Anomalies } from '../systems/anomalies.js';
 import { Krasue } from '../ghosts/krasue.js';
 import { Memes } from '../systems/memes.js';
+import { MiniGames } from '../systems/minigames.js';
 import { Night1 } from '../nights/night1.js';
 import { Night2 } from '../nights/night2.js';
 import { Night3 } from '../nights/night3.js';
@@ -46,9 +47,10 @@ export class Director {
     this.anomalies = new Anomalies({ scene, level });
     this.krasue = new Krasue(scene, level);
     this.memes = new Memes({ scene });
+    this.games = new MiniGames({ scene, level, player, camera });
     const ctx = {
       scene, camera, renderer, level, player, peachi, cut: this.cut, doors: this.doors, hide: this.hide, requests: this.requests,
-      phone: this.phone, power: this.power, anomalies: this.anomalies, krasue: this.krasue, memes: this.memes, params,
+      phone: this.phone, power: this.power, anomalies: this.anomalies, krasue: this.krasue, memes: this.memes, games: this.games, params,
     };
     this.nights = { 1: new Night1(ctx), 2: new Night2(ctx), 3: new Night3(ctx) };
     this.maxNight = Math.max(...Object.keys(this.nights).map(Number));
@@ -167,6 +169,7 @@ export class Director {
     this.hide.reset();
     this.phone.reset();
     this.power.reset();
+    this.games.stop(true);
     if (this.cut.active) this.cut.skip();
     Talk.stop();
     this.player.enabled = false;

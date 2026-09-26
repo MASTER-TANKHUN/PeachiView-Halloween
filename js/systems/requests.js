@@ -35,6 +35,33 @@ export const REQUESTS = {
     fail: 'ไม่มีใครสนใจพีชชี่เลย…',
   },
 };
+// requests that are mini-games (they finish through complete()), and the photo one (through onPhoto())
+Object.assign(REQUESTS, {
+  photo: {
+    note: 'ถ่ายรูปพีชชี่หน่อย โพสท่ารอแล้ว', time: 50, hold: true,
+    ask: ['ถ่ายรูปพีชชี่หน่อย! โพสท่ารอแล้ว (C หรือคลิกขวา ยกกล้อง)', 'อยากได้รูปใหม่ลงช่อง! ถ่ายให้หน่อยน้า มุมสวยๆ'],
+    ok: ['สวยมั้ย! ส่งให้ดูด้วยนะ', 'รูปนี้ขึ้นปกคลิปเลย!'],
+    fail: 'ไม่มีใครถ่ายรูปให้เลย… เมื่อยแล้ว',
+  },
+  popcat: {
+    note: 'เล่น POPCAT บนคอมให้ 80 ที', time: 55,
+    ask: ['มอด เล่น POPCAT บนคอมพีชชี่ให้หน่อย! แข่งกับประเทศอื่นอยู่ ขอ 80 ที', 'POPCAT อันดับตกแล้ว! ไปกดที่คอมห้องสตรีมให้หน่อย'],
+    ok: ['POPCAT ไทยแลนด์ขึ้นอันดับแล้ว!!', 'นิ้วไวมาก มอดคนนี้ใช้ได้'],
+    fail: 'อันดับตกหมดแล้ว… ไม่เป็นไร (งอน)',
+  },
+  dance: {
+    note: 'เต้นตามท่าพีชชี่', time: 45, hold: true,
+    ask: ['มาเต้นกัน! ยืนใกล้ๆ แล้วกด E ดูท่าพีชชี่นะ', 'ท่าเต้นใหม่! มาจำท่ากัน ห้ามพลาดนะมอด'],
+    ok: ['เต้นเก่งนี่ ไปแคสต์ไอดอลได้แล้ว', 'เป๊ะ! ถ่ายไปลงติ๊กต็อกได้เลย'],
+    fail: 'ไม่เต้นด้วยเลย… เขินเหรอ',
+  },
+  karaoke: {
+    note: 'ร้องคาราโอเกะที่ทีวีด้วยกัน', time: 60,
+    ask: ['ไปร้องคาราโอเกะที่ทีวีห้องนั่งเล่นกัน! พีชชี่แต่งเพลงเองเลยนะ', 'อยากร้องเพลง! มอดไปเปิดคาราโอเกะที่ทีวีให้หน่อย'],
+    ok: ['เสียงดีกว่าที่คิดนะเนี่ย!', 'คู่ดูโอ้ใหม่ของช่อง: พีชชี่กับมอด!'],
+    fail: 'ไม่มีใครร้องด้วยเลย… ร้องคนเดียวก็ได้ (เศร้า)',
+  },
+});
 const LONELY_NEED = 8; // seconds near her
 const TIME = 45;
 
@@ -85,12 +112,13 @@ export class Requests {
   start(kind) {
     if (this.active || this.peachi.isAngry) return false;
     const R = REQUESTS[kind];
-    this.active = { kind, left: TIME, progress: 0 };
+    this.active = { kind, left: R.time || TIME, progress: 0 };
     if (kind === 'dark') {
       this.level.setRoomLights('stream', false);
       sfx.play('powerDown');
     }
-    this.peachi.hold = kind === 'lonely';
+    this.peachi.hold = kind === 'lonely' || !!R.hold;
+    if (kind === 'photo') { this.peachi._setExpression('happy'); }
     this._say(pick(R.ask));
     sfx.play('notify');
     this._ui();
@@ -127,6 +155,14 @@ export class Requests {
   }
 
   noteOf(kind) { return (REQUESTS[kind] && REQUESTS[kind].note) || ''; }
+
+  /** A mini-game finished: true completes the request (a failed try just lets you try again). */
+  complete(kind, ok) { if (ok && this.active && this.active.kind === kind) this._finish(true); }
+  /** A photo was taken: the photo request wants Peachi in it. */
+  onPhoto(photo) {
+    if (!this.active || this.active.kind !== 'photo') return;
+    if (photo.hits.some((h) => h.kind === 'peachi' && h.score >= 18)) this._finish(true);
+  }
 
   cancel() { if (this.active) { if (this.active.kind === 'dark') this.level.setRoomLights('stream', true); this.active = null; this.peachi.hold = false; UI.setRequest(null); } }
 

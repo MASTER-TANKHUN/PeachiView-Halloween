@@ -23,6 +23,8 @@ const ROUTER = new THREE.Vector3(9.6, 0.09, 4.62); // inside the TV cabinet
 const MIRROR = new THREE.Vector3(9.8355, 1.62, -3.3);
 const WIFI_PW = 'peachi249';
 const KRASUE_USER = 'กระสือ_Official';
+const BOARD_WORDS = { stream: [['ส', 'ต', 'ร', 'ม'], 'สตรีม'], kitchen: [['ค', 'ร', 'ว'], 'ครัว'], living: [['น', 'ง', 'ล', 'น'], 'นั่งเล่น'], bathroom: [['ห', 'ง', 'น'], 'ห้องน้ำ'], hallway: [['ถ', 'ง'], 'โถง'], bedroom: [['ข', 'ก'], 'แขก'] };
+
 
 function goldenPeach() {
   const g = new THREE.Group();
@@ -118,7 +120,6 @@ export class Night2 extends NightBase {
     this.wifiKnown = false; this.wifiUsed = false; this.wifiAsked = false;
     this.lures = [];
     this.spawnT = 999;
-    this.reqTimer = 999;
     this.seek = null; this.seekDone = false;
     this.mirrorEv = null;
     this.stats.licks = 0; this.stats.reports = 0;
@@ -270,6 +271,17 @@ export class Night2 extends NightBase {
     }];
   }
 
+  requestPool() { return ['hungry', 'lonely', 'dark', 'photo', 'popcat', 'dance', 'karaoke']; }
+  requestAllowed(k) { return k !== 'dark' || this.power.on; } // no "turn the light on" in a blackout
+  requestsPaused() { return !!this.seek; }
+  itemSpotsTaken() { return []; }
+  boardAnswer() {
+    const a = this.anomalies.active[0];
+    if (!a) return { letters: ['ไม่'], reading: 'ไม่ (บ้านยังปกติ… ตอนนี้)' };
+    const [letters, word] = BOARD_WORDS[a.rooms[0]] || [['ใช่'], 'ใช่'];
+    return { letters, reading: `มีอะไรแปลกๆ ที่${word}` };
+  }
+
   get reportEnabled() { return true; }
   reportInfo() {
     return { title: `รายงานถูกแล้ว ${this.anomalies.reported}/${NEED}`, sub: this.peachState === 'none' ? 'ครบ 5 จุด ลูกพีชทองจะโผล่' : 'ลูกพีชทองโผล่แล้ว (รายงานต่อได้ ได้ยอดวิว)' };
@@ -354,14 +366,6 @@ export class Night2 extends NightBase {
     // Peachi hates the dark
     peachi.moodScale = this.power.on ? 1 : 1.5;
 
-    // requests (no "turn the light on" during a blackout)
-    this.reqTimer -= dt;
-    if (this.reqTimer <= 0 && !this.requests.active && !peachi.isAngry && !hide.hidden && !this.seek) {
-      const kinds = ['hungry', 'lonely', ...(this.power.on ? ['dark'] : [])].filter((k) => k !== this.lastReq);
-      const k = pick(kinds);
-      if (this.requests.start(k)) this.lastReq = k;
-      this.reqTimer = rand(70, 90);
-    }
 
     this._updatePeach(dt, t);
     if (this.hour >= 2.5 && !this.seekDone && !this.seek && this.power.on && !peachi.isAngry && !hide.hidden && peachi.state !== 'jumpscare') this._seekStart();
