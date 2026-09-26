@@ -7,7 +7,7 @@ Run a page headless: `node tools/smoke.mjs <page.html> <out.png> [waitMs] [click
 ## File ownership (edit ONLY your own files)
 | Owner | Files |
 |---|---|
-| A — Peachi model | `js/peachi/model.js`, `js/peachi/face.js`, `js/peachi/anim.js`, `peachi-viewer.html` |
+| A — Peachi model | `js/peachi/model.js`, `js/peachi/face.js`, `js/peachi/anim.js`, `js/peachi/peachi3d.js`, `peachi-viewer.html`, `peachi-3d.html`, `assets/models/peachi.*`, `tools/blender/**` |
 | B — World & player | `js/level.js`, `js/player.js` |
 | C — UI / audio / mic | `js/ui.js`, `js/mic.js`, `js/audio.js`, `js/data/chat.js`, `css/style.css` |
 | D — Game logic | `js/main.js`, `js/night.js`, `js/ghosts/peachi.js` |
@@ -40,6 +40,8 @@ export function buildPeachi({ ghost = true } = {}) // → PeachiModel
 export function buildHeadphonesItem() // → THREE.Group, the glowing cat-ear headphones pickup (~0.3 m), spins/bobs itself via userData.update(dt,t)
 ```
 Recognizable features (from `PLAN.md` §5): pink/white cat-ear headphones with peach logo, long wavy brown hair → pink tips, iridescent off-shoulder white/pink jacket, white crop top with peach "PEACHI", black pleated skirt with pink stripes, pink straps "PEACHI", heart choker, right leg white thigh-high "249 PEACH", chunky white/pink sneakers, big amber anime eyes. Face = CanvasTexture (`face.js`), 4 expressions. Ghost mode: legs fade out toward the floor, pink Fresnel rim glow, slightly translucent. Low-poly `flatShading`, ≤ ~5k tris.
+
+**Rigged 3D model (current look).** `buildPeachi({ ghost = true, use3d = true })` returns the procedural model above at once and swaps in the rigged GLB `assets/models/peachi.glb` as soon as it has loaded (same contract, plus getters `expression`, `pose`, `is3D`; `use3d: false` = procedural only; if loading fails it stays procedural). The old builder is `buildPeachiProcedural()`. `preloadPeachi3D(url)` starts/caches the load, and every `buildPeachi()` shares that one instance (one Peachi at a time). The GLB is ~1.60 m tall (real proportions, not chibi), faces +Z, has 124 bones (Mixamo names + hair/skirt/strap chains) and 11 clips; `setPose` maps to `Idle`/`Float`/`Reach`/`Jumpscare`. Runtime API: `js/peachi/peachi3d.js` (`loadPeachi`); demo: `peachi-3d.html`; generator + rebuild: `tools/blender/README.md`; handoff notes: `docs/PEACHI_3D_AI_PROMPT.md`. Never hand-edit the GLB: change `tools/blender/` and rebuild.
 
 ### B: `js/level.js`
 ```js

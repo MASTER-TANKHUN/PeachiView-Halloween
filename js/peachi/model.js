@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { createFace, makeAngerMarkTexture } from './face.js';
 import { createAnimator } from './anim.js';
+import { loadPeachi } from './peachi3d.js';
 
 // ---------- palette (sampled from the reference sheet) ----------
 const C = {
@@ -220,7 +221,7 @@ function strandGeo(len, w, { depth = 0.42, waves = 2.3, amp = 0.028, phase = 0, 
 }
 
 // =====================================================================
-export function buildPeachi({ ghost = true } = {}) {
+export function buildPeachiProcedural({ ghost = true } = {}) {
   const U = makeGhostUniforms(ghost);
   const T = makeTextures();
   const face = createFace();
@@ -498,4 +499,70 @@ export function buildHeadphonesItem() {
     Object.values(M).forEach((m) => m.dispose()); T.logo.dispose(); halo.dispose(); sprite.material.dispose();
   };
   return group;
+}
+
+
+// =====================================================================
+// Rigged 3D Peachi (assets/models/peachi.glb, built by tools/blender/build_peachi.py).
+// buildPeachi() keeps the old synchronous contract: it returns the procedural model at
+// once and swaps in the rigged GLB as soon as it has loaded (falls back if loading fails).
+let glbPromise = null;
+export function preloadPeachi3D(url = 'assets/models/peachi.glb') {
+  if (!glbPromise) {
+    glbPromise = loadPeachi(url).catch((e) => {
+      console.warn('[peachi] GLB load failed, keeping the procedural model:', e);
+      return null;
+    });
+  }
+  return glbPromise;
+}
+
+const EXPR_TO_EMOTION = { happy: 'happy', cry: 'cry', angry: 'angry', scream: 'scream' };
+const POSE_TO_CLIP = { idle: 'Idle', float: 'Float', reach: 'Reach', jumpscare: 'Jumpscare' };
+
+export function buildPeachi({ ghost = true, use3d = true } = {}) {
+  const proc = buildPeachiProcedural({ ghost });
+  if (!use3d) return proc;
+  const group = new THREE.Group();
+  group.name = 'Peachi';
+  group.add(proc.group);
+  const st = { expr: 'happy', pose: 'idle', glow: 0 };
+  let three = null;
+  let disposed = false;
+  preloadPeachi3D().then((p) => {
+    if (!p || disposed) return;
+    three = p;
+    group.remove(proc.group);
+    proc.dispose();
+    group.add(p.object);
+    p.setLookAt(false);
+    p.setGhost(ghost ? 1 : 0);
+    p.setEmotion(EXPR_TO_EMOTION[st.expr] || 'happy');
+    p.play(POSE_TO_CLIP[st.pose] || 'Idle', 0);
+    p.setRim(0.35 + 1.2 * st.glow);
+  });
+  return {
+    group,
+    get expression() { return st.expr; },
+    get pose() { return st.pose; },
+    get is3D() { return !!three; },
+    setExpression(name) {
+      st.expr = name;
+      if (three) three.setEmotion(EXPR_TO_EMOTION[name] || 'happy'); else proc.setExpression(name);
+    },
+    setPose(name) {
+      if (name === st.pose && three) return;
+      st.pose = name;
+      if (three) three.play(POSE_TO_CLIP[name] || 'Idle'); else proc.setPose(name);
+    },
+    setGlow(v) {
+      st.glow = THREE.MathUtils.clamp(v, 0, 1);
+      if (three) three.setRim(0.35 + 1.2 * st.glow); else proc.setGlow(v);
+    },
+    update(dt, t) { if (three) three.update(dt, null); else proc.update(dt, t); },
+    dispose() {
+      disposed = true;
+      if (three) group.remove(three.object); else proc.dispose();
+    },
+  };
 }
