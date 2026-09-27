@@ -109,7 +109,7 @@ export class Night2 extends NightBase {
   introCard() {
     return {
       title: 'คืนที่ 2', clock: '00:00', date: '31 ตุลาคม ก่อนรุ่ง  ·  ไลฟ์มาแล้ว 247 ชั่วโมง',
-      text: 'บ้านเริ่มเปลี่ยนไปทีละจุด รายงานให้ครบ 5 จุด ลูกพีชทองจะโผล่ แล้วเอาไปคืนที่โต๊ะสตรีมก่อนหกโมงเช้า',
+      text: 'บ้านเริ่มเปลี่ยนไปทีละจุด เจอของที่ย้าย เพิ่มมา หรือเปลี่ยนสี ให้กด C ยกกล้องแล้วคลิกถ่ายเป็นหลักฐาน ครบ 5 จุด ลูกพีชทองจะโผล่ แล้วเอาไปคืนที่โต๊ะสตรีมก่อนหกโมงเช้า',
       story: pick(STORIES),
     };
   }
@@ -202,7 +202,7 @@ export class Night2 extends NightBase {
     this.seekObj.visible = false;
     this._objective();
     this.bot(BOT.n2Hello);
-    UI.toast('รอบนี้มีมือถือ! กด Tab เปิด (ภารกิจ / รายงาน / แผนที่ / กล้อง)');
+    UI.toast('รอบนี้มีมือถือ! C = ยกกล้องถ่ายรูป · Tab = ภารกิจ / รายงาน / แผนที่');
 
     // ---- the script
     this.at(0.02, () => { this.bot(BOT.guest); sfx.play('cackle'); });
