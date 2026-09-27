@@ -184,7 +184,7 @@ export class Phone {
       const facing = s.facing ? !!s.facing() : false;
       const special = s.special ? !!s.special() : false;
       const score = Math.round((s.base || 30) * center * near * (facing ? 1.3 : 1) * (special ? 2 : 1));
-      hits.push({ ...s, score, facing, special, dist: d });
+      hits.push({ ...s, score, facing, special, dist: d, nx: _ndc.x, ny: _ndc.y });
     }
     hits.sort((a, b) => b.score - a.score);
     const total = hits.reduce((n, h) => n + h.score, 0);

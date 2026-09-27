@@ -1,5 +1,6 @@
 // Spot the difference (Night 2): the house changes one thing at a time, somewhere you aren't looking.
-// Open the phone (Tab) → รายงาน, pick the room and what kind of change it is. Right: +10 viewers,
+// Photograph it (C, click) or open the phone (Tab) → รายงาน, pick the room and what kind of change it is.
+// The chat drops clues about ones left alone for a while (the room, then the kind). Right: +10 viewers,
 // Peachi calms down (−10 mood), the thing goes back to normal. Wrong: −5 viewers. Leaving 3 or more
 // unreported makes Krasue stronger; 5 correct reports bring out the golden peach.
 // Everything here is added at runtime (the house itself is merged geometry): a few "baseline" props that
@@ -410,9 +411,9 @@ export class Anomalies {
   get unresolved() { return this.active.length; }
   get left() { return this.queue.length; }
 
-  /** Report a room + kind. Returns { ok, anomaly }. */
-  report(room, kind) {
-    const a = this.list.find((x) => x.active && x.rooms.includes(room) && x.kind === kind);
+  /** Report a room + kind (or give the anomaly itself: a photo of it). Returns { ok, anomaly }. */
+  report(room, kind, direct = null) {
+    const a = direct && direct.active ? direct : this.list.find((x) => x.active && x.rooms.includes(room) && x.kind === kind);
     if (!a) { this.wrong++; return { ok: false }; }
     this._set(a, false);
     this.reported++;
@@ -423,11 +424,12 @@ export class Anomalies {
   _set(a, on) {
     if (a.active === on) return;
     a.active = on;
+    a.age = 0; a.clue = 0; // seconds on, and how much the chat has hinted at it
     for (const o of a.show || []) o.visible = on;
     try { if (on) a.on && a.on(); else a.off && a.off(); } catch (e) { console.warn('[anomaly]', a.id, e); }
   }
 
   update(dt, t, ctx) {
-    for (const a of this.list) if (a.active && a.update) a.update(dt, t, ctx);
+    for (const a of this.list) if (a.active) { a.age += dt; if (a.update) a.update(dt, t, ctx); }
   }
 }

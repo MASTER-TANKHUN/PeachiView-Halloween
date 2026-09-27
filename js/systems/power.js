@@ -87,7 +87,8 @@ export class Power {
     window.addEventListener('keydown', (e) => {
       if (!this.q) return;
       if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) this._hit(); }
-      else if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && !e.repeat) this.close();
+      // (the E that opened the dial reaches this listener too: it mustn't close it again)
+      else if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && !e.repeat && this.q.t > 0.3) this.close();
     });
     window.addEventListener('mousedown', (e) => { if (this.q && e.button === 0) this._hit(); });
     this.reset();

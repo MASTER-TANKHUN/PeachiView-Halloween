@@ -777,13 +777,17 @@ export const UI = {
     subTimer = setTimeout(() => { E.subtitle.hidden = true; }, Math.max(800, ms));
     subFinish = () => { clearInterval(subType); body.textContent = chars.join(''); };
   },
-  /** A tutorial bubble pointing at the chat (html allowed: <kbd>Q</kbd>), null hides it. */
-  coach(htmlText) {
+  /** A tutorial bubble pointing at the chat (html allowed: <kbd>Q</kbd>), null hides it. free: no arrow, mid-left. */
+  coach(htmlText, { free = false } = {}) {
     if (!root) return;
     if (!E.coach) { E.coach = el('div', 'coach', root); E.coach.hidden = true; }
     E.coach.hidden = !htmlText;
+    E.coach.classList.toggle('free', !!free);
     if (htmlText) E.coach.innerHTML = htmlText;
+    return (E.coachId = (E.coachId || 0) + 1);
   },
+  /** Hide the bubble only if it's still the one coach() returned id for. */
+  coachOff(id) { if (E.coach && E.coachId === id) E.coach.hidden = true; },
   /** Show the whole line at once (the player pressed while it was typing). */
   subtitleFinish() { if (subFinish) subFinish(); },
   /** The "▶ Space" nudge on a cutscene line that's waiting for the player. */

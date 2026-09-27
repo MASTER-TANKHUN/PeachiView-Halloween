@@ -75,6 +75,8 @@ export class PeachiGhost {
     this._pose = null;
     this._flicker = null;
     this.group.scale.setScalar(1);
+    this.group.visible = true; // a scene or the jail may have hidden her, or left her on the mirror layer
+    this.group.traverse((o) => o.layers.set(0));
     const pos = spawnPos || pick(this.level.ghostSpawns) || new THREE.Vector3();
     this.group.position.set(pos.x, 0, pos.z);
     this.group.rotation.set(0, 0, 0);
@@ -111,7 +113,7 @@ export class PeachiGhost {
     if (this.lookOverride) this.model.lookAt(this.lookOverride);
     else if (ctx && ctx.camera && this.state !== 'jumpscare') this.model.lookAt(ctx.camera.getWorldPosition(this._eye || (this._eye = new THREE.Vector3())));
     this.model.update(dt, t);
-    if (!this.active || !ctx) return;
+    if (!this.active || !ctx || !ctx.player) return; // (no player: a scene, or she stops to watch a mini-game)
     const { player, camera, hour = 0, hidden = false } = ctx;
     const pos = this.group.position;
     const pp = player.position;

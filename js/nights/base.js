@@ -577,8 +577,9 @@ export class NightBase {
       if (this.state !== 'play') return;
     }
 
-    // --- ghost
-    peachi.update(dt, t, { player, camera, hour: this.hour, hidden });
+    // --- ghost (she stops and watches while you play a mini-game)
+    const watching = this.games && this.games.active && peachi.state !== 'jumpscare';
+    peachi.update(dt, t, watching ? { camera } : { player, camera, hour: this.hour, hidden });
     if (this.state !== 'play') return; // caught during this update
     if (jumpscaring || peachi.state === 'jumpscare') { this.jumpscareUpdate(dt, t); return; }
 

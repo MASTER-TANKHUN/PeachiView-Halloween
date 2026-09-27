@@ -1,5 +1,5 @@
-// Mini-games that happen inside the night — the clock keeps running and the ghosts keep moving while you
-// play, so every one of them is also a risk:
+// Mini-games that happen inside the night — the clock keeps running while you play and Peachi stops to
+// watch, but the other ghosts keep moving, so every one of them is also a risk:
 //   POPCAT      — at the stream PC: pop the cat 80 times in 15 s (click / E / Space)
 //   เต้นตาม     — Peachi dances a sequence of arrows; repeat it (arrow keys or WASD), two rounds
 //   คาราโอเกะ   — at the living-room TV: hit the notes on the beat (Space / click, or sing into the mic)

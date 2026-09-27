@@ -18,6 +18,8 @@ import { BOT, HER, KRASUE, STORIES, LOSE } from '../data/story.js';
 import { ROOM_NAMES, KINDS } from '../systems/anomalies.js';
 import { BREAKER } from '../systems/power.js';
 import { Ach } from '../game/meta.js';
+import { Save } from '../game/save.js';
+import { DIFF } from '../game/difficulty.js';
 
 const HYPE = ['ลูกพีชน้อย_249', 'peachlover', 'นอนไม่หลับ', 'ลูกพีชซ่า', 'mod_ตัวจริง'];
 const NEED = 5;                                   // correct reports for the golden peach
@@ -26,6 +28,8 @@ const ROUTER = new THREE.Vector3(9.6, 0.09, 4.62); // inside the TV cabinet
 const MIRROR = new THREE.Vector3(9.8355, 1.62, -3.3);
 const WIFI_PW = 'peachi249';
 const KRASUE_USER = 'กระสือ_Official';
+// seconds an anomaly sits unreported before the chat names its room, then what kind of change it is
+const CLUES = () => (DIFF.id === 'easy' ? [15, 35] : DIFF.id === 'hard' ? [45, 90] : [25, 55]);
 const BOARD_WORDS = { stream: [['ส', 'ต', 'ร', 'ม'], 'สตรีม'], kitchen: [['ค', 'ร', 'ว'], 'ครัว'], living: [['น', 'ง', 'ล', 'น'], 'นั่งเล่น'], bathroom: [['ห', 'ง', 'น'], 'ห้องน้ำ'], hallway: [['ถ', 'ง'], 'โถง'], bedroom: [['ข', 'ก'], 'แขก'] };
 
 
@@ -247,14 +251,14 @@ export class Night2 extends NightBase {
     else if (!this.power.on) t = 'ไฟดับ! ไปซ่อมเบรกเกอร์ในครัว';
     else if (this.peachState === 'table') t = 'ลูกพีชทองโผล่แล้ว! ไปหยิบที่โต๊ะปาร์ตี้ในครัว';
     else if (this.peachState === 'carried') t = 'เอาลูกพีชทองไปวางที่โต๊ะสตรีม (R ค้าง = ซ่อนแสง)';
-    else t = `รายงานความผิดปกติในบ้าน (Tab) ${this.anomalies.reported}/${NEED}`;
+    else t = `หาสิ่งที่เปลี่ยนไปในบ้าน ${this.anomalies.reported}/${NEED} · ถ่ายรูป (C) หรือรายงาน (Tab)`;
     UI.setObjective(t);
   }
 
   goalRows() {
     const rows = [];
     const r = this.anomalies.reported;
-    if (this.peachState === 'none') rows.push({ text: `รายงานความผิดปกติ ${r}/${NEED}`, sub: 'ครบแล้วลูกพีชทองจะโผล่', kind: 'goal' });
+    if (this.peachState === 'none') rows.push({ text: `รายงานความผิดปกติ ${r}/${NEED}`, sub: 'ถ่ายรูปสิ่งที่เปลี่ยนไป (C แล้วคลิก) หรือรายงานในแท็บรายงาน · ครบแล้วลูกพีชทองจะโผล่', kind: 'goal' });
     else if (this.peachState === 'table') rows.push({ text: 'หยิบลูกพีชทองที่โต๊ะปาร์ตี้ (ครัว)', kind: 'goal' });
     else if (this.peachState === 'carried') rows.push({ text: 'เอาลูกพีชทองไปวางที่โต๊ะสตรีม', sub: this.peachHidden ? 'ซ่อนแสงอยู่ (เดินช้า)' : 'แสงดึงกระสือ! กด R ค้างเพื่อซ่อน', kind: 'goal' });
     if (!this.power.on) rows.push({ text: 'ไฟดับ: ซ่อมเบรกเกอร์ในครัว', sub: 'กด Space ตอนเข็มอยู่ในช่องเขียว', urgent: true });
@@ -287,18 +291,22 @@ export class Night2 extends NightBase {
 
   get reportEnabled() { return true; }
   reportInfo() {
-    return { title: `รายงานถูกแล้ว ${this.anomalies.reported}/${NEED}`, sub: this.peachState === 'none' ? 'ครบ 5 จุด ลูกพีชทองจะโผล่' : 'ลูกพีชทองโผล่แล้ว (รายงานต่อได้ ได้ยอดวิว)' };
+    const clues = this._clueRooms();
+    const sub = this.peachState === 'none' ? 'ครบ 5 จุด ลูกพีชทองจะโผล่ · ถ่ายรูปสิ่งนั้น (C) ก็นับเป็นรายงาน' : 'ลูกพีชทองโผล่แล้ว (รายงานต่อได้ ได้ยอดวิว)';
+    return { title: `รายงานถูกแล้ว ${this.anomalies.reported}/${NEED}`, sub: clues.length ? `${sub} · แชตว่ามีอะไรแปลกๆ ที่: ${clues.join(', ')}` : sub };
   }
-  report(room, kind) {
+  _clueRooms() { return [...new Set(this.anomalies.active.filter((a) => a.clue > 0).map((a) => ROOM_NAMES[a.rooms[0]]))]; }
+  report(room, kind, direct = null) {
     if (this.state !== 'play') return;
-    const r = this.anomalies.report(room, kind);
+    const r = this.anomalies.report(room, kind, direct);
     if (r.ok) {
       this.stats.reports++;
       Ach.count('anomalies', 1);
       this._addViewers(10);
       this.peachi.mood = Math.max(0, this.peachi.mood - 10);
       this.bot(pick(BOT.rightReport));
-      UI.toast(`รายงานถูก! "${r.anomaly.name}" (${this.anomalies.reported}/${NEED})`);
+      UI.toast(`${direct ? 'ถ่ายหลักฐานได้' : 'รายงานถูก'}! "${r.anomaly.name}" (${this.anomalies.reported}/${NEED})`);
+      if (!(Save.data.tips && Save.data.tips.anomaly)) { Save.set({ tips: { ...(Save.data.tips || {}), anomaly: true } }); UI.coachOff(this._coachId); }
       this.spawnT = Math.min(this.spawnT, rand(8, 14));
       if (this.anomalies.reported >= NEED && this.peachState === 'none') this._spawnPeach();
     } else {
@@ -314,6 +322,7 @@ export class Night2 extends NightBase {
     const icons = [];
     if (!this.power.on) icons.push({ x: BREAKER.x + 0.6, z: BREAKER.z + 0.6, icon: '⚡' });
     if (this.peachState === 'table') icons.push({ x: TABLE.x, z: TABLE.z, icon: '🍑' });
+    for (const a of this.anomalies.active) if (a.clue >= 2) icons.push({ x: a.pos.x, z: a.pos.z, icon: '❓' });
     const k = this.krasue;
     if (k.visible && k.active && Math.hypot(k.position.x - this.player.position.x, k.position.z - this.player.position.z) < 8) icons.push({ x: k.position.x, z: k.position.z, icon: '👻' });
     let hint = 'ห้องที่เปิดไฟไว้จะดึงกระสือไปหา';
@@ -340,6 +349,12 @@ export class Night2 extends NightBase {
   onPhotoTaken(photo) {
     this.lures.push({ pos: this.player.position.clone(), kind: 'lure', strength: 2, range: 10, t: 2.5 }); // the flash is a light too
     if (photo.hits.some((h) => h.kind === 'krasue' && h.special)) this.chat(pick(HYPE), 'กระสือเป๊ะมาก 555 ลงไอจีเลย');
+    // a clear photo of an anomaly is the report (close enough, and not at the very edge of the frame)
+    for (const h of photo.hits) {
+      if (h.kind !== 'anomaly' || h.dist > 6.5 || Math.abs(h.nx) > 0.8 || Math.abs(h.ny) > 0.8) continue;
+      const a = this.anomalies.byId[h.id];
+      if (a && a.active) this.report(a.rooms[0], a.kind, a);
+    }
   }
 
   // ---------------------------------------------------------------- update
@@ -352,12 +367,16 @@ export class Night2 extends NightBase {
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
         this.spawnT = rand(28, 40);
-        if (anomalies.unresolved < 4 && anomalies.spawnNext(player)) {
-          if (Math.random() < 0.35) this.chat(pick(HYPE), pick(['เหมือนบ้านเปลี่ยนไปนิดนึงนะ', 'เมื่อกี้มีอะไรขยับมั้ย', 'บ้านนี้แปลกๆ แล้ว']));
+        const a = anomalies.unresolved < 4 && anomalies.spawnNext(player);
+        if (a) {
+          const p = this.panAt(a.pos.x, a.pos.z); // a faint glitch from where it happened
+          sfx.play('glitch', { n: 2, pan: p.pan, vol: Math.max(0.25, Math.min(0.8, 3 / (1 + p.dist * 0.3))) });
+          this.chat(pick(HYPE), pick(['เหมือนบ้านเปลี่ยนไปนิดนึงนะ', 'เมื่อกี้มีอะไรขยับมั้ย', 'บ้านนี้แปลกๆ แล้ว', 'ได้ยินเสียงแปลกๆ มั้ยมอด']));
         } else if (anomalies.unresolved < 4) this.spawnT = 3; // you were standing in the only room left
       }
     }
     krasue.strong = anomalies.unresolved >= 3;
+    this._clues();
 
     // Krasue follows the lights
     for (const L of this.lures) L.t -= dt;
@@ -387,9 +406,28 @@ export class Night2 extends NightBase {
     const a = this.anomalies.spawn('bear') || this.anomalies.spawnNext(this.player);
     this.spawnT = rand(30, 40);
     this.bot(BOT.anomalyTip);
-    this.peachi.line('เอ๊ะ… หมีบนตู้หนังสือห้องนั่งเล่นหันหลังไปแล้ว! มอดรายงานในมือถือหน่อย');
-    UI.toast('เปิดมือถือ (Tab) → รายงาน → เลือกห้อง → เลือกสิ่งที่เปลี่ยน');
+    this.peachi.line('เอ๊ะ… หมีบนตู้หนังสือห้องนั่งเล่นหันหลังไปแล้ว! มอดไปถ่ายรูปเป็นหลักฐานหน่อย');
+    UI.toast('ไปที่ห้องนั่งเล่น กด C ยกกล้อง แล้วคลิกถ่ายหมีบนตู้หนังสือ (หรือ Tab → รายงาน)');
+    if (!(Save.data.tips && Save.data.tips.anomaly)) this._coachId = UI.coach('บ้านเริ่มเปลี่ยน! ของย้าย / เพิ่มมา / เปลี่ยนสี<br>กด <kbd>C</kbd> ยกกล้อง แล้ว<b>คลิกถ่าย</b>ให้เห็นชัดๆ<br>หรือ <kbd>Tab</kbd> → รายงาน → ห้อง → สิ่งที่เปลี่ยน', { free: true });
+    const id = this._coachId;
+    setTimeout(() => UI.coachOff(id), 30000);
     if (!a) this.spawnT = 5;
+  }
+  /** Anomalies left alone: the chat names the room, later what changed (and the map marks it). */
+  _clues() {
+    const [c1, c2] = CLUES();
+    for (const a of this.anomalies.active) {
+      if (a.id === 'bear') continue; // Peachi already said it out loud
+      const room = ROOM_NAMES[a.rooms[0]];
+      if (a.clue < 1 && a.age > c1) {
+        a.clue = 1;
+        this.chat(pick(HYPE), pick([`ที่${room}มีอะไรแปลกๆ นะ`, `มอดไปดู${room}หน่อย เหมือนมีอะไรเปลี่ยน`, `${room}ไม่เหมือนเดิมแล้วอะ`]));
+      } else if (a.clue < 2 && a.age > c2) {
+        a.clue = 2;
+        const kind = (KINDS.find((k) => k.id === a.kind) || {}).label || '';
+        this.chat('mod_ตัวจริง', `คำใบ้: ${room} → "${kind}" (ดูแผนที่ในมือถือ มีเครื่องหมาย ❓)`);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- blackouts
