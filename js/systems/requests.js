@@ -165,7 +165,7 @@ export class Requests {
   /** A photo was taken: the photo request wants Peachi in it. */
   onPhoto(photo) {
     if (!this.active || this.active.kind !== 'photo') return;
-    if (photo.hits.some((h) => h.kind === 'peachi' && h.score >= 18)) this._finish(true);
+    if (photo.hits.some((h) => h.kind === 'peachi' && h.raw >= 18)) this._finish(true);
   }
 
   cancel() { if (this.active) { if (this.active.kind === 'dark') this.level.setRoomLights('stream', true); this.active = null; this.peachi.hold = false; UI.setRequest(null); } }

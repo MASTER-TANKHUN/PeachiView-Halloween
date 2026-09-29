@@ -521,7 +521,7 @@ export const UI = {
         f.style.setProperty('--r', `${[-4, 3, -2][i] || 0}deg`);
         const img = el('img', null, f); img.src = p.url; img.alt = p.caption || '';
         el('figcaption', null, f, p.caption || '');
-        if (p.score) el('b', 'tnum', f, `+${p.score}`);
+        if (p.raw || p.score) el('b', 'tnum', f, `★ ${p.raw || p.score}`);
       });
       d.stats.replaceChildren();
       for (const [k, v] of data.stats || []) { const r = el('div', 'end-stat', d.stats); el('span', null, r, k); el('b', 'tnum', r, String(v)); }

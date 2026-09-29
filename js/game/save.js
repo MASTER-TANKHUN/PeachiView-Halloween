@@ -71,7 +71,7 @@ export const Save = {
   },
   addPhoto(p) {
     if (!p || !p.url) return;
-    this.data.photos.push({ url: p.url, caption: p.caption, score: p.score });
+    this.data.photos.push({ url: p.url, caption: p.caption, score: p.raw ?? p.score });
     while (this.data.photos.length > 12) this.data.photos.shift();
     write();
   },

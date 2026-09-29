@@ -117,6 +117,23 @@ export function buildLevel(scene) {
     }
     return pos;
   }
+  /** Does a wall (or a shut door) stand between a and b? Only a slab crossed from face to face counts, so
+   *  something hung on the near face of a wall, or a door looked at from either side, is still in sight. */
+  function wallBetween(a, b) {
+    const dx = b.x - a.x, dz = b.z - a.z;
+    for (const c of boxes) {
+      if (!c.wall || c.off) continue;
+      let t0 = -Infinity, t1 = Infinity;
+      if (Math.abs(dx) < 1e-9) { if (a.x <= c.x0 || a.x >= c.x1) continue; } else {
+        const u = (c.x0 - a.x) / dx, v = (c.x1 - a.x) / dx; t0 = Math.max(t0, Math.min(u, v)); t1 = Math.min(t1, Math.max(u, v));
+      }
+      if (Math.abs(dz) < 1e-9) { if (a.z <= c.z0 || a.z >= c.z1) continue; } else {
+        const u = (c.z0 - a.z) / dz, v = (c.z1 - a.z) / dz; t0 = Math.max(t0, Math.min(u, v)); t1 = Math.min(t1, Math.max(u, v));
+      }
+      if (t0 < t1 && t0 >= 0 && t1 < 0.999) return true;
+    }
+    return false;
+  }
   function roomAt(pos) {
     for (const k in PLAN.rooms) { const r = PLAN.rooms[k]; if (pos.x >= r.x0 && pos.x <= r.x1 && pos.z >= r.z0 && pos.z <= r.z1) return k; }
     return null;
@@ -230,7 +247,7 @@ export function buildLevel(scene) {
     setFlicker(on) { flicker = !!on; if (!flicker) flickM = 1; },
     update,
     // extras (not part of the contract)
-    scene, root, colliders: boxes, rooms: PLAN.rooms, roomAt, meshes, materials: M, moon, V, screens: rooms.screens,
+    scene, root, colliders: boxes, rooms: PLAN.rooms, roomAt, wallBetween, meshes, materials: M, moon, V, screens: rooms.screens,
     porch,
     doors: doorById,
     /** Swing a door to open/closed. slam: fast. instant: no animation. */

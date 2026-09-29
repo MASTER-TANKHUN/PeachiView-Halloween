@@ -174,7 +174,7 @@ export class NightBase {
 
   /** The night's best three photos (for the end card). */
   _highlights() {
-    return (this.phone ? this.phone.photos : []).filter((p) => p.url && p.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+    return (this.phone ? this.phone.photos : []).filter((p) => p.url && p.raw > 0).sort((a, b) => b.raw - a.raw).slice(0, 3);
   }
 
   abort() {
@@ -323,15 +323,17 @@ export class NightBase {
   }
   onPhoto(photo) {
     this.stats.photos++;
-    Ach.photographed(photo.hits.filter((h) => h.score > 0).map((h) => h.kind));
-    this.stats.bestPhoto = Math.max(this.stats.bestPhoto, photo.score);
-    if (photo.score > 0) {
-      this._addViewers(Math.min(40, Math.round(photo.score / 5)));
+    Ach.photographed(photo.hits.filter((h) => h.raw > 0).map((h) => h.kind));
+    this.stats.bestPhoto = Math.max(this.stats.bestPhoto, photo.raw || 0);
+    // viewers: what the photo is worth now (a repeat of the same subject is worth less, see phone.js)
+    photo.gain = photo.score > 0 ? Math.max(1, Math.min(40, Math.round(photo.score / 5))) : 0;
+    if (photo.gain) {
+      this._addViewers(photo.gain);
       if (photo.score >= 40) this.chat(pick(HYPE_USERS), pick(['รูปนี้ต้องเป็นปกคลิป!', 'แคปจอไว้แล้ว!!', 'ขอรูปนี้ทำโปรไฟล์']));
-    }
+    } else if (photo.repeat && Math.random() < 0.5) this.chat(pick(HYPE_USERS), pick(['รูปเดิมอีกแล้วว', 'ถ่ายอันนี้ไปแล้วมอด', 'เห็นแล้วๆ ขออย่างอื่นบ้าง']));
     for (const m of this.missions) {
       if (m.done || !m.photo) continue;
-      const hit = photo.hits.find((h) => h.kind === m.photo && h.score >= (m.min || 15));
+      const hit = photo.hits.find((h) => h.kind === m.photo && h.raw >= (m.min || 15));
       if (hit) {
         m.done = true;
         this._addViewers(m.reward || 25);

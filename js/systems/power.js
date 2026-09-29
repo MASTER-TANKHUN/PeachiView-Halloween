@@ -6,7 +6,7 @@ import { UI } from '../ui.js';
 import { sfx } from '../audio.js';
 import { panFor } from './doors.js';
 
-export const BREAKER = new THREE.Vector3(-8.9, 1.45, 1.15); // kitchen, north wall, facing into the room
+export const BREAKER = new THREE.Vector3(-8.9, 1.45, 1.1); // kitchen, on the north wall's face, facing into the room
 const TAU = Math.PI * 2;
 
 function labelTexture() {
@@ -23,40 +23,44 @@ function labelTexture() {
 }
 
 function buildBox() {
+  // a shallow cabinet (open tray + hinged door): the breakers sit inside it, behind the closed door
   const g = new THREE.Group();
   g.name = 'breakerBox';
   const metal = new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.45, metalness: 0.6 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.7 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.1), metal);
-  body.position.z = 0.05;
-  const inner = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.48), dark);
-  inner.position.z = 0.101;
-  g.add(body, inner);
-  // three breaker levers + one main
+  const W = 0.42, H = 0.52, D = 0.12, T = 0.02;
+  const part = (w, h, d, x, y, z, m = metal) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
+  part(W, H, T, 0, 0, T / 2);                                          // back plate (against the wall)
+  for (const s of [-1, 1]) part(T, H, D, s * (W - T) / 2, 0, D / 2);   // sides
+  for (const s of [-1, 1]) part(W - 2 * T, T, D, 0, s * (H - T) / 2, D / 2); // top, bottom
+  const inner = new THREE.Mesh(new THREE.PlaneGeometry(W - 2 * T, H - 2 * T), dark);
+  inner.position.z = T + 0.001;
+  g.add(inner);
+  // three breaker levers, mounted on the back plate (they stay inside the box when they flip)
   const levers = [];
   const leverMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.5 });
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.6 });
   for (let i = 0; i < 3; i++) {
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, 0.03), new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.6 }));
-    base.position.set(-0.12 + i * 0.12, 0.04, 0.115);
-    const pivot = new THREE.Group(); pivot.position.set(-0.12 + i * 0.12, 0.04, 0.13);
+    const x = -0.12 + i * 0.12;
+    part(0.07, 0.14, 0.03, x, 0.04, T + 0.015, baseMat);
+    const pivot = new THREE.Group(); pivot.position.set(x, 0.04, T + 0.03);
     const lever = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.03), leverMat);
     lever.position.y = 0.03;
     pivot.add(lever);
-    g.add(base, pivot);
+    g.add(pivot);
     levers.push(pivot);
   }
-  const led = new THREE.Mesh(new THREE.CircleGeometry(0.012, 12), new THREE.MeshBasicMaterial({ color: 0x40ff70, toneMapped: false }));
-  led.position.set(0.15, -0.18, 0.103);
-  g.add(led);
-  // the door (hinged on the left), with the warning label
-  const hinge = new THREE.Group(); hinge.position.set(-0.21, 0, 0.105);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.012), metal);
-  door.position.set(0.21, 0, 0.006);
+  // the door (hinged on the left) closes over the rim, with the warning label, the handle and the LED
+  const hinge = new THREE.Group(); hinge.position.set(-W / 2, 0, D);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.012), metal);
+  door.position.set(W / 2, 0, 0.006);
   const label = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.13), new THREE.MeshStandardMaterial({ map: labelTexture(), roughness: 0.8 }));
-  label.position.set(0.21, 0.12, 0.013);
+  label.position.set(W / 2, 0.12, 0.013);
   const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.08, 0.02), dark);
-  handle.position.set(0.38, -0.02, 0.02);
-  hinge.add(door, label, handle);
+  handle.position.set(W - 0.04, -0.02, 0.02);
+  const led = new THREE.Mesh(new THREE.CircleGeometry(0.012, 12), new THREE.MeshBasicMaterial({ color: 0x40ff70, toneMapped: false }));
+  led.position.set(W - 0.06, -0.19, 0.0125);
+  hinge.add(door, label, handle, led);
   g.add(hinge);
   g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
   return { group: g, levers, led, hinge };

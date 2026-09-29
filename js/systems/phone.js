@@ -5,7 +5,9 @@
 //   กล้อง   — the photos taken tonight; C / right click raises the camera anywhere
 // Camera mode: a viewfinder, mouse wheel zooms, left click shoots (flash + shutter). A photo is scored by
 // what's in frame (ghosts, anomalies), how close and how centered, whether they face you and whether they
-// are doing something special (Krasue posing). The thumbnail is grabbed right after the frame renders.
+// are doing something special (Krasue posing). Walls and shut doors hide what's behind them. The chat gets
+// bored of the same subject: a repeat within 20 s is worth nothing, and each later one less (see REPEAT).
+// The thumbnail is grabbed right after the frame renders.
 import * as THREE from 'three';
 import { UI } from '../ui.js';
 import { sfx } from '../audio.js';
@@ -15,6 +17,8 @@ import { roomsLinked } from '../ghosts/nav.js';
 
 const TABS = [['missions', 'ภารกิจ'], ['report', 'รายงาน'], ['map', 'แผนที่'], ['camera', 'กล้อง']];
 const MIN_FOV = 28;
+const REPEAT = [1, 0.5, 0.25, 0.1, 0]; // what the n-th photo of the same subject (or pose) is worth
+const REPEAT_GAP = 20;                 // seconds: sooner than this, a repeat is worth nothing
 const pad = (n) => String(Math.max(0, Math.floor(n))).padStart(2, '0');
 const el = (tag, cls, parent, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; if (parent) parent.appendChild(n); return n; };
 const _ndc = new THREE.Vector3(), _v = new THREE.Vector3();
@@ -34,6 +38,8 @@ export class Phone {
     this.zoom = 0;
     this.shotCool = 0;
     this.pending = null;
+    this.clock = 0;        // seconds the phone has been live tonight
+    this.shotOf = new Map(); // subject key → { n: photos that counted, t: last shot }
     // what the night provides
     this.provider = null; // { missionRows(), actions(), report(room, kind), reportEnabled, reportInfo(), mapInfo(), subjects(), onPhoto(photo) }
     this._dom();
@@ -53,6 +59,8 @@ export class Phone {
     this.close();
     this.lower();
     this.photos = [];
+    this.shotOf.clear();
+    this.clock = 0;
     this.gallery.replaceChildren();
     this.provider = null;
   }
@@ -179,26 +187,35 @@ export class Phone {
       _ndc.copy(_v).project(cam);
       if (_ndc.z > 1 || Math.abs(_ndc.x) > 0.95 || Math.abs(_ndc.y) > 0.95) continue;
       if (!roomsLinked(this.level, here, this.level.roomAt(_v))) continue;
+      if (this.level.wallBetween && this.level.wallBetween(cam.position, _v)) continue; // behind a wall: not in the photo
       const center = 1 - Math.min(1, Math.hypot(_ndc.x, _ndc.y)) * 0.5;
       const near = Math.max(0.35, Math.min(1.5, 1.7 - d / 7)) * (1 + this.zoom * 0.4);
       const facing = s.facing ? !!s.facing() : false;
       const special = s.special ? !!s.special() : false;
-      const score = Math.round((s.base || 30) * center * near * (facing ? 1.3 : 1) * (special ? 2 : 1));
-      hits.push({ ...s, score, facing, special, dist: d, nx: _ndc.x, ny: _ndc.y });
+      const raw = Math.round((s.base || 30) * center * near * (facing ? 1.3 : 1) * (special ? 2 : 1));
+      // the same subject again: the chat has seen it (a special pose counts as a new picture once)
+      const key = `${s.id || s.kind}${special ? ':special' : ''}`;
+      const memo = this.shotOf.get(key) || { n: 0, t: -1e9 };
+      const worth = this.clock - memo.t < REPEAT_GAP ? 0 : REPEAT[Math.min(memo.n, REPEAT.length - 1)];
+      memo.t = this.clock;
+      if (worth > 0) memo.n++;
+      this.shotOf.set(key, memo);
+      hits.push({ ...s, raw, score: Math.round(raw * worth), repeat: worth < 1, facing, special, dist: d, nx: _ndc.x, ny: _ndc.y });
     }
-    hits.sort((a, b) => b.score - a.score);
+    hits.sort((a, b) => b.raw - a.raw);
     const total = hits.reduce((n, h) => n + h.score, 0);
     const best = hits[0];
     let caption = 'บ้านมืดๆ… ไม่มีอะไรในรูป';
     if (best) caption = typeof best.caption === 'function' ? best.caption(best) : best.caption || best.name;
-    return { t: performance.now(), score: total, subjects: hits.map((h) => h.kind), ids: hits.map((h) => h.id || h.kind), hits, caption, url: null };
+    return { t: performance.now(), score: total, raw: best ? best.raw : 0, repeat: !!best && total === 0, subjects: hits.map((h) => h.kind), ids: hits.map((h) => h.id || h.kind), hits, caption, url: null };
   }
 
   _polaroid(p) {
     const card = el('div', 'polaroid', null);
     if (p.url) { const img = el('img', null, card); img.src = p.url; img.alt = ''; } else el('div', 'polaroid-blank', card);
     el('div', 'polaroid-cap', card, p.caption);
-    if (p.score > 0) el('div', 'polaroid-score tnum', card, `+${p.score}`);
+    if (p.gain > 0) el('div', 'polaroid-score tnum', card, `+${p.gain} ผู้ชม`);
+    else if (p.repeat) el('div', 'polaroid-score dull', card, 'รูปซ้ำ คนดูเห็นแล้ว');
     this.polaroids.appendChild(card);
     while (this.polaroids.children.length > 2) this.polaroids.firstChild.remove();
     setTimeout(() => card.classList.add('out'), 2600);
@@ -208,6 +225,7 @@ export class Phone {
   // ---------------------------------------------------------------- update
   update(dt) {
     if (this.shotCool > 0) this.shotCool -= dt;
+    if (this.enabled) this.clock += dt;
     if (!this.enabled) { if (this.open) this.close(); if (this.cameraUp) this.lower(); return; }
     if (this.cameraUp) {
       if (!this.player.enabled) { this.lower(); return; }
@@ -306,7 +324,7 @@ export class Phone {
         for (const p of this.photos.slice().reverse().slice(0, 6)) {
           const c = el('div', 'mshot', g);
           if (p.url) { const img = el('img', null, c); img.src = p.url; img.alt = ''; }
-          el('div', 'mshot-cap', c, `${p.caption}${p.score ? ` (+${p.score})` : ''}`);
+          el('div', 'mshot-cap', c, `${p.caption}${p.gain ? ` (+${p.gain} ผู้ชม)` : p.repeat ? ' (รูปซ้ำ)' : ''}`);
         }
       }
     }

@@ -82,11 +82,12 @@ export function buildShell(kit, plan, M, root) {
     kit.add('ceiling', S.plane(r.x1 - r.x0, r.z1 - r.z0), { p: [(r.x0 + r.x1) / 2, H, (r.z0 + r.z1) / 2], r: [Math.PI / 2, 0, 0], uv: 'world', ao: false, color: r.ceiling ?? 0xd8d0d8 });
   }
   // colliders: every wall slab outside door openings (full thickness, both rooms at once); a door leaf
-  // gets its own collider that is switched off while it stands open
+  // gets its own collider that is switched off while it stands open. Both are marked `wall` (they block
+  // the camera's line of sight, furniture doesn't)
   for (const w of plan.wallLines) {
     const ops = openingsOn(plan, w.axis, w.at, w.a, w.b).filter((o) => o.y0 === 0 && o.kind === 'door');
     let cur = w.a;
-    const col = (u0, u1) => { if (u1 - u0 < 1e-3) return; const c = (u0 + u1) / 2; if (w.axis === 'x') kit.collide(c, w.at, u1 - u0, T); else kit.collide(w.at, c, T, u1 - u0); };
+    const col = (u0, u1) => { if (u1 - u0 < 1e-3) return; const c = (u0 + u1) / 2; if (w.axis === 'x') kit.collide(c, w.at, u1 - u0, T); else kit.collide(w.at, c, T, u1 - u0); kit.colliders[kit.colliders.length - 1].wall = true; };
     for (const o of ops) { col(cur, o.c - o.w / 2); cur = o.c + o.w / 2; }
     col(cur, w.b);
   }
@@ -164,8 +165,8 @@ function doorLeaf(kit, o, M, root, T) {
   // closed-door collider across the opening (world space, XZ)
   const [cx, cz] = o.axis === 'x' ? [o.c, o.at] : [o.at, o.c];
   const collider = o.axis === 'x'
-    ? { x0: cx - o.w / 2, x1: cx + o.w / 2, z0: cz - T / 2, z1: cz + T / 2, off: false }
-    : { x0: cx - T / 2, x1: cx + T / 2, z0: cz - o.w / 2, z1: cz + o.w / 2, off: false };
+    ? { x0: cx - o.w / 2, x1: cx + o.w / 2, z0: cz - T / 2, z1: cz + T / 2, off: false, wall: true }
+    : { x0: cx - T / 2, x1: cx + T / 2, z0: cz - o.w / 2, z1: cz + o.w / 2, off: false, wall: true };
   kit.colliders.push(collider);
   const door = { id: o.id || String(o.c), o, pivot, swing, sign: L.hinge * L.swing, openAngle: L.open || 1.5, angle: 0, collider, center: new THREE.Vector3(cx, 1.3, cz) };
   const angle = o.closed ? 0 : door.openAngle;

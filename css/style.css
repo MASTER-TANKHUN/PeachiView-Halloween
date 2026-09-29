@@ -547,6 +547,7 @@ kbd {
 .polaroid img, .polaroid-blank { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #1a1418; }
 .polaroid-cap { position: absolute; left: 10px; right: 10px; bottom: 6px; font-family: var(--f-hand); font-size: 14px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .polaroid-score { position: absolute; right: -10px; top: -10px; padding: 3px 8px; font-family: var(--f-head); font-weight: 700; font-size: 14px; color: #1a0610; background: #7dffb0; border-radius: 12px; transform: rotate(6deg); }
+.polaroid-score.dull { font-size: 12px; font-weight: 600; color: #f4e8ee; background: #5a4a58; }
 .polaroid.out { opacity: 0; transform: rotate(-3deg) translateY(-20px); }
 
 /* Krasue's lick: green slime over the screen */
