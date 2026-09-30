@@ -279,6 +279,10 @@ export class Night3 extends NightBase {
   requestsPaused() { return this.redlight.active || this.bossOn; }
   clockPaused() { return this.bossOn; }
   get karaokeSong() { return 'halloween'; }
+  onGodSave() {
+    if (this.fake.state === 'lunge') this.fake.reset();
+    if (this.pop.state === 'jumpscare') this.pop.enter();
+  }
   canPray() { return !this.soda.held; } // with red soda in hand, the shrine is for Phi Pop
   boardAnswer() {
     if (this.pieces.pendant === 'hidden') return { letters: ['ก', 'ร', 'จ', 'ก'], reading: 'กระจก' };
@@ -374,12 +378,14 @@ export class Night3 extends NightBase {
       this.viewers = Math.max(this.viewers, 60); // the boss is the threat, not the viewer count
       return;
     }
-    this.pop.update(dt, t, ctx);
-    if (this.state !== 'play') return;
-    this.fake.update(dt, t, ctx);
-    if (this.state !== 'play') return;
-    this.mannequin.update(dt, ctx);
-    this.krasue.update(dt, t, ctx);
+    if (!this.inMiniGame) { // you can't move during Peachi's mini-games, so the guests wait too
+      this.pop.update(dt, t, ctx);
+      if (this.state !== 'play') return;
+      this.fake.update(dt, t, ctx);
+      if (this.state !== 'play') return;
+      this.mannequin.update(dt, ctx);
+      this.krasue.update(dt, t, ctx);
+    }
     this.waiting.update(dt, t, player);
 
     // the Room of Waiting: first step inside

@@ -384,7 +384,7 @@ export class Night2 extends NightBase {
     const lures = [...this.lures];
     if (this.peachState === 'table') lures.push({ pos: this.holder.position, kind: 'peach', strength: 4, range: 22 });
     if (this.peachState === 'carried' && !this.peachHidden) lures.push({ pos: player.position, kind: 'player', strength: 4, range: 22 });
-    krasue.update(dt, t, { player, camera: this.camera, lures, cameraUp: this.phone.cameraUp, playerHidden: hide.hidden });
+    if (!this.inMiniGame) krasue.update(dt, t, { player, camera: this.camera, lures, cameraUp: this.phone.cameraUp, playerHidden: hide.hidden }); // she waits while you can't move
 
     // Peachi hates the dark
     peachi.moodScale = this.power.on ? 1 : 1.5;

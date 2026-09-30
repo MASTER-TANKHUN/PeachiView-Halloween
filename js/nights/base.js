@@ -49,6 +49,8 @@ export class NightBase {
   get god() { return this.params?.get('god') === '1'; }
   /** Space is taken by something else right now (the breaker QTE): no screaming. */
   get inputLock() { return !!((this.power && this.power.busy) || (this.games && this.games.busy)); }
+  /** A mini-game that holds the player still (the spirit board lets you walk). */
+  get inMiniGame() { return !!(this.games && this.games.active && this.games.game !== 'board'); }
 
   _resetVars() {
     this.time = 0;
@@ -221,7 +223,7 @@ export class NightBase {
 
   lose(reason) {
     if (this.state !== 'play') return;
-    if (this.god && reason !== 'resign' && reason !== 'timeout') { this.peachi.reset(pick(this.level.ghostSpawns)); this.peachi.active = true; this.player.enabled = true; UI.toast('[god] รอด'); return; }
+    if (this.god && reason !== 'resign' && reason !== 'timeout') { this.peachi.reset(pick(this.level.ghostSpawns)); this.peachi.active = true; this.onGodSave(); this.player.enabled = true; UI.toast('[god] รอด'); return; }
     if ((reason === 'caught' || reason === 'found') && DIFF.jail && !this.jailUsed && this.jail) { // ลูกพีชน้อย: bathroom jail
       this.jailUsed = true;
       const P = this.peachi;
@@ -405,6 +407,8 @@ export class NightBase {
     this._placeBatteries();
   }
 
+  /** ?god=1 only: whatever "caught" you lets go, so a long test run keeps going. */
+  onGodSave() {}
   get karaokeSong() { return 'default'; }
   canPray() { return true; }
   /** The spirit board's answer: consonants (and ใช่ / ไม่ / ลาก่อน), and what the chat reads it as. */
