@@ -177,17 +177,14 @@ const handprints = () => art(320, 420, (g, w, h) => {
   g.fillStyle = 'rgba(170,10,24,0.9)'; g.font = '700 58px Sriracha, cursive'; g.textAlign = 'center';
   g.fillText('ข้างหลัง', w / 2, 240);
 });
-const calendarX = () => art(150, 210, (g, w, h) => {
+const calendarX = () => art(150, 210, (g, w, h) => { // over the tear-off page (thaiCalendar): the 31 circled, every line crossed out
   g.clearRect(0, 0, w, h);
-  g.strokeStyle = 'rgba(200,10,20,0.85)'; g.lineWidth = 3; g.lineCap = 'round';
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) {
-    if (r === 4 && c === 3) continue;
-    const x = 12 + c * 19, y = 80 + r * 24;
-    g.beginPath(); g.moveTo(x - 6, y - 7); g.lineTo(x + 6, y + 7); g.moveTo(x + 6, y - 7); g.lineTo(x - 6, y + 7); g.stroke();
-  }
-  g.lineWidth = 4; g.beginPath(); g.ellipse(69, 176, 16, 13, 0, 0, TAU); g.stroke();
-  g.fillStyle = 'rgba(200,10,20,0.9)'; g.font = '700 22px Sriracha, cursive'; g.textAlign = 'center'; g.fillText('31', 69, 184);
-  g.font = '600 15px Sriracha, cursive'; g.fillText('วันสุดท้าย', 75, 206);
+  const ink = 'rgba(28,4,8,0.92)';
+  g.strokeStyle = ink; g.lineCap = 'round';
+  g.lineWidth = 6; g.beginPath(); g.ellipse(75, 97, 50, 40, -0.08, 0, TAU); g.stroke();
+  g.lineWidth = 3;
+  for (const y of [146, 162, 178, 194]) for (let x = 16; x <= 134; x += 17) { g.beginPath(); g.moveTo(x - 6, y - 6); g.lineTo(x + 6, y + 6); g.moveTo(x + 6, y - 6); g.lineTo(x - 6, y + 6); g.stroke(); }
+  g.fillStyle = ink; g.font = '700 17px Sriracha, cursive'; g.textAlign = 'center'; g.fillText('วันสุดท้าย', 75, 207);
 });
 const cleanClockFace = () => art(256, 256, (g, w, h) => {
   g.fillStyle = '#f6efe2'; g.beginPath(); g.arc(w / 2, h / 2, w / 2 - 4, 0, TAU); g.fill();
@@ -214,8 +211,8 @@ function defs(level) {
 
   // baseline: a bear on the living-room bookcase, facing the room. Anomaly: it turns its back.
   const B = bear(0xd89a70);
-  B.position.set(8.25, 2.0, 1.3);
-  def({ id: 'bear', name: 'หมีบนตู้หนังสือหันหลัง', rooms: ['living'], kind: 'moved', pos: V(8.25, 2.1, 1.3), base: [B],
+  B.position.set(8.25, 2.0, 1.3); B.scale.setScalar(1.6); // big enough that its back vs its face reads from across the room (it's the tutorial one)
+  def({ id: 'bear', name: 'หมีบนตู้หนังสือหันหลัง', rooms: ['living'], kind: 'moved', pos: V(8.25, 2.25, 1.3), base: [B],
     on() { B.rotation.y = PI; }, off() { B.rotation.y = 0; } });
 
   // baseline: a portrait of grandma in the hall. Anomaly: her eyes follow you.
@@ -225,14 +222,15 @@ function defs(level) {
   P.add(mesh(new THREE.BoxGeometry(0.5, 0.6, 0.02), mat(0xc8a040, { rough: 0.4, metal: 0.6 }), [0, 0, 0.005]));
   const canvas = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.5), new THREE.MeshStandardMaterial({ map: portraitArt(), roughness: 0.6 }));
   canvas.position.z = 0.031; P.add(canvas);
+  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x0a0406, roughness: 0.2, emissive: 0xff1a2a, emissiveIntensity: 0 });
   const eyes = [-1, 1].map((s) => {
     const e = new THREE.Group(); e.position.set(s * 0.021, 0.059, 0.028);
     e.add(mesh(sph(0.012, 12, 10), mat(0xf4ece0, { rough: 0.3 })));
-    const pupil = mesh(sph(0.0062, 10, 8), mat(0x0a0406, { rough: 0.2 }), [0, 0, 0.009], [1, 1, 0.5]);
+    const pupil = mesh(sph(0.0062, 10, 8), pupilMat, [0, 0, 0.009], [1, 1, 0.5]);
     e.add(pupil); P.add(e); return e;
   });
   def({ id: 'portrait', name: 'ตาภาพคุณยายมองตาม', rooms: ['hallway'], kind: 'picture', pos: V(-1.4, 1.62, 0.89), base: [P],
-    on() {}, off() { for (const e of eyes) e.rotation.set(0, 0, 0); },
+    on() { pupilMat.emissiveIntensity = 2.2; }, off() { pupilMat.emissiveIntensity = 0; for (const e of eyes) e.rotation.set(0, 0, 0); }, // a red glint, or nobody notices in the dark
     update(dt, t, ctx) { for (const e of eyes) e.lookAt(ctx.camera.position); } });
 
   // baseline: a doll in a yellow dress on the hall bench. Anomaly: she's standing in the living room.
@@ -269,8 +267,8 @@ function defs(level) {
     off() { const m = tvMesh.userData.onMat || tvMesh.material; m.map = tvTex; m.needsUpdate = true; } });
 
   // fridge magnets spell "หิว!"
-  const F = decal(magnets(), 0.4, 0.25, V(-9.48, 1.0, 6.122), PI);
-  def({ id: 'fridge', name: 'แม่เหล็กตู้เย็นเรียงเป็นคำว่า หิว', rooms: ['kitchen'], kind: 'text', pos: V(-9.48, 1.0, 6.12), show: [F] });
+  const F = decal(magnets(), 0.4, 0.25, V(-9.48, 1.5, 6.122), PI); // up on the freezer door: the water dispenser hides the lower one
+  def({ id: 'fridge', name: 'แม่เหล็กตู้เย็นเรียงเป็นคำว่า หิว', rooms: ['kitchen'], kind: 'text', pos: V(-9.48, 1.5, 6.12), show: [F] });
 
   // the skeleton wears cat-ear headphones
   const HP = catHeadphones();
@@ -282,8 +280,11 @@ function defs(level) {
   def({ id: 'banner', name: 'ป้าย 249 กลายเป็น 250', rooms: ['hallway'], kind: 'text', pos: V(9.86, 1.95, 0), show: [BN] });
 
   // pink water in the jar
-  const J = mesh(new THREE.CircleGeometry(0.19, 32), mat(0xff5fa8, { emissive: 0xff2a88, ei: 0.6, rough: 0.2 }), [9.35, 0.604, -1.65], null, [-PI / 2, 0, 0]);
-  def({ id: 'jar', name: 'น้ำในโอ่งเป็นสีชมพู', rooms: ['bathroom'], kind: 'color', pos: V(9.35, 0.6, -1.65), show: [J] });
+  const J = mesh(new THREE.CircleGeometry(0.19, 32), mat(0xff5fa8, { emissive: 0xff2a88, ei: 1.5, rough: 0.2 }), [9.35, 0.604, -1.65], null, [-PI / 2, 0, 0]);
+  const JG = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55,
+    map: art(64, 64, (g) => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,80,170,1)'); r.addColorStop(1, 'rgba(255,80,170,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); }) }));
+  JG.position.set(9.35, 0.72, -1.65); JG.scale.setScalar(0.6); // a pink haze over the mouth: the dipper hides most of the water
+  def({ id: 'jar', name: 'น้ำในโอ่งเป็นสีชมพู', rooms: ['bathroom'], kind: 'color', pos: V(9.35, 0.6, -1.65), show: [J, JG] });
 
   // ten red sodas lined up in front of the TV
   const RS = new THREE.Group();
@@ -331,7 +332,7 @@ function defs(level) {
   const doorMeshes = [];
   if (bathDoor) bathDoor.swing.traverse((o) => { if (o.isMesh) doorMeshes.push(o); });
   def({ id: 'door', name: 'ประตูห้องน้ำกลายเป็นสีแดง', rooms: ['bathroom', 'hallway'], kind: 'color', pos: bathDoor ? bathDoor.center.clone() : V(6.8, 1.1, -1), need: doorMeshes.length > 0,
-    on() { for (const m of doorMeshes) { m.userData.baseMat = m.material; m.material = m.material.clone(); m.material.color.setRGB(0.5, 0.03, 0.05); } },
+    on() { for (const m of doorMeshes) { m.userData.baseMat = m.material; m.material = m.material.clone(); m.material.color.setRGB(0.5, 0.03, 0.05); if (m.material.emissive) { m.material.emissive.setRGB(0.35, 0.01, 0.03); m.material.emissiveIntensity = 1; } } },
     off() { for (const m of doorMeshes) if (m.userData.baseMat) { m.material.dispose(); m.material = m.userData.baseMat; m.userData.baseMat = null; } } });
 
   // the kitchen light turns red
