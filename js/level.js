@@ -8,6 +8,7 @@ import { Kit } from './world/kit.js';
 import { createMaterials } from './world/materials.js';
 import { buildShell, buildOutside } from './world/shell.js';
 import { furnish } from './world/rooms.js';
+import { Settings } from './settings.js';
 
 const H = 2.8, T = 0.2;
 const DOOR = { y0: 0, y1: 2.15, kind: 'door' };
@@ -219,14 +220,16 @@ export function buildLevel(scene) {
   function update(dt, t) {
     for (const d of doors) moveDoor(d, dt);
     shakeDoors(dt, t);
-    if (flashT > 0) { flashT = Math.max(0, flashT - dt); moon.intensity = moonBase * (1 + 5 * flashT * (0.6 + 0.4 * Math.sin(t * 90))); } else if (moon.intensity !== moonBase) moon.intensity = moonBase;
+    const calm = Settings.get().calm || Settings.get().streamer; // no strobing for "fewer flashes" / streamer mode
+    if (flashT > 0) { flashT = Math.max(0, flashT - dt); moon.intensity = moonBase * (1 + (calm ? 1.5 * flashT : 5 * flashT * (0.6 + 0.4 * Math.sin(t * 90)))); } else if (moon.intensity !== moonBase) moon.intensity = moonBase;
     const hue = 0.86 + 0.07 * Math.sin(t * 0.9);
     emitRGB.color.setHSL(hue, 0.9, 0.62);
     if (rgbLight) rgbLight.color.setHSL(hue, 0.85, 0.6);
 
     if (flicker) {
       flickT -= dt;
-      if (flickT <= 0) { flickT = 0.04 + Math.random() * 0.12; flickM = Math.random() < 0.35 ? 0.03 : 0.35 + Math.random() * 0.9; }
+      if (flickT <= 0 && calm) { flickT = 0.3 + Math.random() * 0.4; flickM = 0.45 + Math.random() * 0.45; } // slow and never black
+      else if (flickT <= 0) { flickT = 0.04 + Math.random() * 0.12; flickM = Math.random() < 0.35 ? 0.03 : 0.35 + Math.random() * 0.9; }
     } else flickM = 1;
     for (const L of lights) {
       let m = 1;
@@ -280,6 +283,7 @@ export function buildLevel(scene) {
       syncMeshes();
       syncSwitches();
       flicker = false; flickM = 1;
+      moon.color.setHex(0x8ea6ff); // the ending's sunrise tints it
     },
   };
 }

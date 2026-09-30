@@ -34,6 +34,19 @@ const SNACKS = 10;
 const HALL_MIRROR = V(-6.9, 1.72, -0.884);
 const BATH_MIRROR = V(9.8355, 1.62, -3.3);
 const PENDANT_AT = V(-6.3, 1.45, 0.86);      // hanging on the hall's south wall — only the mirror shows it
+
+// a soft pink glow that makes a small piece readable in the dark (flat: a pool of light on the floor)
+function pinkGlow(size, flat = false) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,150,200,1)'); gr.addColorStop(0.35, 'rgba(255,90,170,0.45)'); gr.addColorStop(1, 'rgba(255,90,170,0)');
+  x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+  const opts = { map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
+  const halo = flat ? new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial(opts)) : new THREE.Sprite(new THREE.SpriteMaterial(opts));
+  if (flat) halo.rotation.x = -Math.PI / 2;
+  halo.scale.setScalar(size);
+  return halo;
+}
 const FRIDGE = V(-9.3, 1.0, 5.95);
 const SHRINE_TOP = V(3.64, 1.05, 6.31);
 const SIGN_AT = V(0.9, 1.55, 1.108);
@@ -64,16 +77,10 @@ export class Night3 extends NightBase {
     this.redlight = new RedLight({ player: this.player, peachi: this.peachi, level });
     // the pendant hangs where only a mirror can see it (layer 3)
     this.pendant = buildPendant(); this.pendant.position.copy(PENDANT_AT); this.pendant.rotation.y = Math.PI; this.pendant.scale.setScalar(2.2);
-    { // a pink glow so it catches the eye in the mirror
-      const c = document.createElement('canvas'); c.width = c.height = 64;
-      const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-      gr.addColorStop(0, 'rgba(255,150,200,1)'); gr.addColorStop(0.35, 'rgba(255,90,170,0.45)'); gr.addColorStop(1, 'rgba(255,90,170,0)');
-      x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
-      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-      halo.scale.setScalar(0.16); this.pendant.add(halo); this.pendantHalo = halo;
-    }
+    this.pendantHalo = pinkGlow(0.16); this.pendant.add(this.pendantHalo); // catches the eye in the mirror
     this.pendant.traverse((o) => o.layers.set(3)); this.pendant.visible = false; scene.add(this.pendant);
     this.strap = buildStrap(); this.strap.visible = false; scene.add(this.strap);
+    this.strapHalo = pinkGlow(0.9, true); this.strapHalo.position.y = 0.005; this.strap.add(this.strapHalo); // on a dark floor
     // what's on the stream desk
     this.deskSet = buildChokerSet(); this.deskSet.visible = false; scene.add(this.deskSet);
     // red soda: in your hand, and on the shrine
@@ -106,6 +113,7 @@ export class Night3 extends NightBase {
     const { level, peachi, doors, requests } = this;
     this.pieces = { pendant: 'hidden', strap: 'inside', lock: 'box' }; // → 'held' → 'placed'
     this.pendantSeen = false;
+    this.mirrorArmed = false; this.lowWarned = false; this.keyEye = false; this.strapFly = null;
     this.soda = { stock: 3, held: false, onShrine: false };
     this.snacks.count = SNACKS;
     this.strapOut = false;
@@ -395,6 +403,7 @@ export class Night3 extends NightBase {
 
     this._updateMirrors();
     this._updateStrap(dt);
+    if (this.strap.visible) this.strapHalo.material.opacity = 0.55 + 0.35 * Math.sin(t * 3);
     if (this.pendant.visible) { this.pendant.rotation.z = Math.sin(t * 1.3) * 0.12; this.pendantHalo.material.opacity = 0.7 + 0.3 * Math.sin(t * 4); }
     this._hud();
   }
@@ -473,11 +482,11 @@ export class Night3 extends NightBase {
   _burp(at) {
     this.chat(POP_USER, 'เอิ๊กกก… ขอบใจหลาน อิ่มไปอีกพักนึง');
     this._addViewers(randInt(10, 16));
-    if (this.pieces.strap === 'inside' && this.hour >= 2) {
+    if (this.pieces.strap === 'inside') {
       this.pieces.strap = 'out';
       this.strapOut = true;
       // it flies out in an arc and lands in front of the shrine
-      this.strapFly = { t: 0, from: V(at.x, 1.35, at.z), to: V(SHRINE.x + 0.4, 0.02, SHRINE.z - 0.5) };
+      this.strapFly = { t: 0, from: V(at.x, 1.35, at.z), to: V(SHRINE.x - 0.3, 0.02, SHRINE.z - 1.0) }; // open floor, not under the armchair
       this.strap.visible = true;
       this.strap.position.copy(this.strapFly.from);
       setTimeout(() => this.state === 'play' && this.chat(pick(HYPE), 'สายโชคเกอร์กระเด็นออกมา!!! อี๋'), 600);
@@ -595,16 +604,25 @@ export class Night3 extends NightBase {
     this.hallMirror.visible = nearHall && (this.mirrorArmed || this.fake.visible);
     this.bathMirror.visible = nearBath && this.fake.visible;
     if (this.mirrorArmed && this.pieces.pendant === 'hidden' && nearHall && !this.pendantSeen) {
-      const fwd = this.camera.getWorldDirection(V());
-      const to = V().subVectors(HALL_MIRROR, this.camera.position);
-      const d = to.length();
-      if (d < 2.6 && fwd.dot(to.normalize()) > 0.86) {
+      if (this._pendantInMirror()) {
         this.pendantSeen = true;
         sfx.play('sparkle');
         UI.toast('ในกระจกมีจี้หัวใจแขวนอยู่ข้างหลัง… แต่หันไปไม่เห็น ลองเดินไปควานดู');
         this.chat(pick(HYPE), 'ในกระจกมีของวิบๆ ที่ผนังข้างหลังมอด!');
       }
     }
+  }
+
+  // the pendant's reflection has to be inside the mirror's frame and on screen, not just "facing the mirror"
+  _pendantInMirror() {
+    const c = this.camera.position;
+    if (c.distanceTo(HALL_MIRROR) > 3.2 || c.z < HALL_MIRROR.z) return false;
+    const img = V(PENDANT_AT.x, PENDANT_AT.y, 2 * HALL_MIRROR.z - PENDANT_AT.z); // mirror faces +z
+    const k = (HALL_MIRROR.z - c.z) / (img.z - c.z);
+    const hx = c.x + (img.x - c.x) * k, hy = c.y + (img.y - c.y) * k;
+    if (Math.abs(hx - HALL_MIRROR.x) > 0.27 || Math.abs(hy - HALL_MIRROR.y) > 0.39) return false;
+    const n = img.project(this.camera);
+    return n.z < 1 && Math.abs(n.x) < 0.8 && Math.abs(n.y) < 0.8;
   }
 
   // ---------------------------------------------------------------- 03:30 the strap

@@ -163,7 +163,7 @@ export function roomBath(P, kit, M, root) {
 
   return {
     lights,
-    itemSpots: [V(8.6, 0.44, -6.4), V(4.92, 0.87, -2.9), V(8.9, 0.02, -2.2)],
+    itemSpots: [V(8.0, 0.44, -6.4), V(4.92, 0.87, -2.9), V(8.9, 0.02, -2.2)],
     navPoints: [V(6.5, 0, -3.5), V(8.3, 0, -4.4)],
     ghostSpawns: [V(7.0, 0, -4.0)],
     update(dt, t) { for (const f of anim) f(dt, t); },

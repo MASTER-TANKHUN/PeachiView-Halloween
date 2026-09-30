@@ -120,13 +120,13 @@ export class Player {
 
   unlock() { if (document.pointerLockElement === this.domElement) document.exitPointerLock(); }
 
-  addInteractable({ position, radius = 1.5, label = '', onUse = () => {}, enabled = () => true }) {
-    const it = { position, radius, label, onUse, enabled };
+  addInteractable({ position, radius = 1.5, label = '', onUse = () => {}, enabled = () => true, priority = 0 }) {
+    const it = { position, radius, label, onUse, enabled, priority };
     this._interactables.add(it);
     return { remove: () => { this._interactables.delete(it); if (this._current === it) this._current = null; } };
   }
 
-  // nearest usable interactable (within radius in XZ, roughly in view)
+  // nearest usable interactable (within radius in XZ, roughly in view, not behind a wall)
   _findTarget() {
     if (!this._enabled) return null;
     this._eyeAndForward();
@@ -141,7 +141,8 @@ export class Player {
       _v.subVectors(p, _eye);
       const d = _v.length();
       if (d > 1e-4 && _v.dot(_fwd) / d < 0.6) continue;
-      if (dxz < bestD) { bestD = dxz; best = it; }
+      if (this.level && this.level.wallBetween && this.level.wallBetween(_eye, p)) continue; // no reaching through walls
+      if (dxz - it.priority < bestD) { bestD = dxz - it.priority; best = it; } // priority: metres of head start
     }
     return best;
   }

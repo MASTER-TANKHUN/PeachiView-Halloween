@@ -80,7 +80,7 @@ export class Night1 extends NightBase {
     this.stolen = false; this.steal = null; // the first time you walk up to them, Peachi snatches them (see _updateSteal)
     this._dropItem(spot);
     this.interact({
-      position: () => this.itemSpot, radius: 1.6, label: '[E] เก็บหูฟังหูแมว',
+      position: () => this.itemSpot, radius: 1.6, label: '[E] เก็บหูฟังหูแมว', priority: 1, // beats a snack rack or a hiding spot next to them
       onUse: () => this._pickup(),
       enabled: () => this.state === 'play' && !this.carrying && !this.placed && !this.hopping && !this.steal,
     });

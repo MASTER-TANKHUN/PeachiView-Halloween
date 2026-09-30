@@ -867,14 +867,15 @@ export const UI = {
       return true;
     },
     spamAges() {
-      const t = now();
-      return chatMsgs.filter((m) => m.type === 'spam' && !m.banned && !m.her).map((m) => (t - m.t0) / 1000);
+      return chatMsgs.filter((m) => m.type === 'spam' && !m.banned && !m.her).map((m) => m.age || 0);
     },
-    expireSpam(maxAge = SPAM_TTL_HINT) {
-      const t = now();
+    /** Ages the live spam by dt of game time (so a paused game doesn't count) and expires the old ones. */
+    expireSpam(maxAge = SPAM_TTL_HINT, dt = 0) {
       let n = 0;
       for (const m of chatMsgs.slice()) {
-        if (m.type === 'spam' && !m.banned && !m.her && (t - m.t0) / 1000 > maxAge) {
+        if (m.type !== 'spam' || m.banned || m.her) continue;
+        m.age = (m.age || 0) + dt;
+        if (m.age > maxAge) {
           m.banned = true; m.el.classList.add('expired');
           setTimeout(() => removeMsg(m), 600);
           n++;

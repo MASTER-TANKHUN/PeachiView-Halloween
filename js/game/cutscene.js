@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { UI } from '../ui.js';
 import { Talk } from './talk.js';
 import { Save } from './save.js';
+import { Settings } from '../settings.js';
 
 const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0);
@@ -138,7 +139,8 @@ export class Cutscene {
   _apply() {
     const c = this.camera;
     c.position.copy(this.eye);
-    if (this.shake > 0) c.position.add(new THREE.Vector3((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake, 0));
+    const k = this.shake * (Settings.get().calm || Settings.get().streamer ? 0.3 : 1);
+    if (k > 0) c.position.add(new THREE.Vector3((Math.random() - 0.5) * k, (Math.random() - 0.5) * k, 0));
     _m.lookAt(this.eye, this.look, _up);
     _q.setFromRotationMatrix(_m);
     c.quaternion.copy(_q);

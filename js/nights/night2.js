@@ -123,7 +123,7 @@ export class Night2 extends NightBase {
   onStart() {
     const { level, peachi, doors, krasue, anomalies, power } = this;
     this.peachState = 'none'; // none | table | carried | placed
-    this.peachHidden = false;
+    this.peachHidden = false; this.peach.visible = true; // a lose while hiding it under the shirt left it hidden
     this.wifiKnown = false; this.wifiUsed = false; this.wifiAsked = false;
     this.lures = [];
     this.spawnT = 999;

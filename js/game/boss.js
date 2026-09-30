@@ -11,6 +11,7 @@ import { UI } from '../ui.js';
 import { sfx } from '../audio.js';
 import { buildPendant, buildStrap, buildLock } from '../world/choker.js';
 import { art } from '../world/tex.js';
+import { Scream } from '../mic.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const TAU = Math.PI * 2;
@@ -18,6 +19,7 @@ export const BOSS_HOME = V(-5.4, 1.95, -4.6);
 const SPAM_TIME = 30, SPAM_NEED = 12;
 const CLAIM_TIME = 40, APPEAL_DIST = 3.2;
 const WINDUP = 2.8, WINDOW = 1.8, REST = 1.6, DEFLECTS = 3, SCREAM_DIST = 9;
+const BANK = 1.3; // a scream this close to the pink window counts once it opens (mashing Space fires a bit early)
 const SPOTS = {
   pendant: { room: 'kitchen', th: 'ครัว', pos: V(-6.4, 1.3, 3.9) },
   strap: { room: 'living', th: 'ห้องนั่งเล่น', pos: V(6.6, 1.3, 4.0) },
@@ -266,7 +268,7 @@ export class Boss {
 
   _phase3() {
     if (this.strikes === this.strikes2 && this.onAppeal) this.onAppeal();
-    this.phase = 3; this.pt = 0; this.swing = 'rest'; this.st = 1.5; this.deflects = 0; this.screamedAt = -9;
+    this.phase = 3; this.pt = 0; this.swing = 'rest'; this.st = 1.5; this.deflects = 0; this.screamedAt = -9; this.banked = false;
     this._setFace('angry');
     this.night.bot('อุทธรณ์ถูกปฏิเสธค่ะ :) เตรียมแบนถาวร');
     UI.toast('กลับไปห้องสตรีม! ค้อนเป็นสีชมพูเมื่อไหร่ → ตะโกน! (Space รัวๆ ตั้งแต่ค้อนแดง)');
@@ -291,7 +293,11 @@ export class Boss {
     } else if (this.phase === 3) {
       const d = this.bot.group.position.distanceTo(pp);
       if (this.swing === 'window' && d < SCREAM_DIST) this._deflect();
-      else if (this.swing === 'windup') { this.screamedAt = this.t; this._setFace('laugh'); this.night.bot('เร็วไปค่ะ :)'); }
+      else if (this.swing === 'windup' && this.st <= BANK) this.banked = true;
+      else if (this.swing === 'windup') {
+        this.screamedAt = this.t; this._setFace('laugh'); this.night.bot('เร็วไปค่ะ :)');
+        Scream.cooldown = Math.min(Scream.cooldown, 0.5); // too early, but there's still time to try again
+      }
     }
   }
 
@@ -406,11 +412,13 @@ export class Boss {
       return;
     }
     if (this.swing === 'rest' && this.st <= 0) {
-      this.swing = 'windup'; this.st = WINDUP;
+      this.swing = 'windup'; this.st = WINDUP; this.banked = false;
       this._setFace('angry'); sfx.play('bash', { vol: 0.6 });
     } else if (this.swing === 'windup' && this.st <= 0) {
       this.swing = 'window'; this.st = WINDOW;
       sfx.play('sparkle'); UI.flash('#ff9ad0');
+      if (this.banked && inRoom && B.group.position.distanceTo(pp) < SCREAM_DIST) this._deflect();
+      this.banked = false;
     } else if (this.swing === 'window' && this.st <= 0) {
       this.swing = 'slam'; this.st = 0.5;
       sfx.play('doorSlam'); sfx.play('ban');

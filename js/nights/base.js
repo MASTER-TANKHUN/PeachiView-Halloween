@@ -433,6 +433,20 @@ export class NightBase {
   }
 
   // spare AA batteries lying around (three a night)
+  // the item spots are tuned for the floating headphones; a battery has to lie on whatever is under it
+  _restY(x, y, z) {
+    const ray = this._ray || (this._ray = new THREE.Raycaster());
+    ray.set(new THREE.Vector3(x, y + 0.35, z), new THREE.Vector3(0, -1, 0));
+    ray.far = 0.9; ray.camera = this.camera; // not all the way down to the floor under a table
+    const n = new THREE.Vector3();
+    for (const h of ray.intersectObject(this.level.root, true)) {
+      if (!h.object.isMesh || !h.face || h.object.material?.transparent) continue;
+      if (n.copy(h.face.normal).transformDirection(h.object.matrixWorld).y < 0.5) continue;
+      return h.point.y + 0.0125;
+    }
+    return null;
+  }
+
   _placeBatteries() {
     if (!this._batt) {
       this._batt = [];
@@ -452,7 +466,9 @@ export class NightBase {
     this._batt.forEach((g, i) => {
       const s = spots[i];
       if (!s) { g.visible = false; return; }
-      g.position.set(s.x + 0.12, s.y + 0.015, s.z); g.rotation.y = Math.random() * Math.PI; g.visible = true;
+      // beside the headphone spot if there's a surface there, else on the spot itself
+      const dx = [0.12, 0, -0.12].find((o) => this._restY(s.x + o, s.y, s.z) != null) ?? 0;
+      g.position.set(s.x + dx, this._restY(s.x + dx, s.y, s.z) ?? s.y + 0.015, s.z); g.rotation.y = Math.random() * Math.PI; g.visible = true;
       this.interact({ position: () => g.position, radius: 1.4, label: '[E] เก็บถ่านไฟฉายสำรอง',
         onUse: () => { g.visible = false; const fl = this.player.flashlight; if (fl) fl.battery = Math.min(100, fl.battery + 45); sfx.play('battery'); UI.toast('ได้ถ่านสำรอง! แบตไฟฉาย +45%'); },
         enabled: () => this.state === 'play' && g.visible });
@@ -594,7 +610,7 @@ export class NightBase {
     if (this.games) this.games.update(dt, t);
     this._updateMissions(dt);
     this._updateChat(dt);
-    this._updateSpamPenalty();
+    this._updateSpamPenalty(dt);
 
     // --- tension & viewers
     const d = peachi.distToPlayer;
@@ -698,8 +714,8 @@ export class NightBase {
   }
 
   // Each spam older than SPAM_TTL costs 10 viewers exactly once.
-  _updateSpamPenalty() {
-    const k = UI.chat.expireSpam(SPAM_TTL) || 0;
+  _updateSpamPenalty(dt) {
+    const k = UI.chat.expireSpam(SPAM_TTL, dt) || 0;
     if (k > 0) {
       this._addViewers(-10 * k);
       if (this.time - this.penaltyToastAt > 3) {

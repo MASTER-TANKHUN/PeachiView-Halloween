@@ -77,7 +77,13 @@ export function buildRoute(level, pos, dest, destRoom, pass, avoid = null) {
   const hops = planRooms(nearestRoom(level, pos), destRoom || nearestRoom(level, dest), pass, avoid);
   if (!hops) return null;
   const r = [];
-  for (const h of hops) { const [a, b] = sides(h); r.push({ p: a.clone(), cross: false, link: h.L }, { p: b.clone(), cross: true, link: h.L }); }
+  hops.forEach((h, i) => {
+    const [a, b] = sides(h);
+    // already in the doorway (past its near side): walking back to it every re-plan jitters in place
+    const past = i === 0 && Math.hypot(b.x - pos.x, b.z - pos.z) < Math.hypot(b.x - a.x, b.z - a.z);
+    if (!past) r.push({ p: a.clone(), cross: false, link: h.L });
+    r.push({ p: b.clone(), cross: true, link: h.L });
+  });
   r.push({ p: V(dest.x, 0, dest.z), cross: false });
   return r;
 }

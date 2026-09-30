@@ -96,6 +96,7 @@ export class RedLight {
 
   _green() {
     this.round++;
+    if (this.round === 1) UI.setObjective('ไฟเขียวไฟแดง: เดินไปหาพีชชี่ตอนไฟเขียว หยุดนิ่งตอนไฟแดง');
     this.len = Math.max(1.6, rand(2.4, 3.6) - this.round * 0.15);
     this.beat = this.len / 3;
     this.said = -1;

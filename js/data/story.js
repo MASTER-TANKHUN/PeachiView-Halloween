@@ -86,8 +86,9 @@ export const NIGHT_DM = {
     { from: 'sys', text: 'PeachiBot: ไลฟ์มาแล้ว 248 ชั่วโมงค่ะ :)', delay: 1200 },
   ],
   4: [
-    { from: 'them', text: 'โชคเกอร์ครบแล้ว… แต่บอทตื่นแล้วจริงๆ', delay: 700 },
-    { from: 'sys', text: 'บอสผีเคลม © และฉากจบมาในอัปเดตถัดไป — เล่นคืนก่อนหน้าได้เลย', delay: 1300 },
+    { from: 'them', text: 'ขอบคุณที่เฝ้าไลฟ์จนจบนะมอด ♡ บอทโดนแบนไปแล้ว', delay: 700 },
+    { from: 'them', text: 'อยากกลับไปเล่นคืนไหนอีก เลือกได้เลยนะ', delay: 1300 },
+    { from: 'sys', text: 'PeachiView: Happy Halloween 🎃', delay: 1100 },
   ],
 };
 

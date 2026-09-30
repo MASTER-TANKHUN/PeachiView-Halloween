@@ -264,7 +264,7 @@ function defs(level) {
   const tvTex = level.screens && level.screens.tv;
   const tvMesh = tvTex ? findMesh(tvTex) : null;
   const tvArt = tvPeachi();
-  def({ id: 'tv', name: 'ทีวีขึ้นคำว่า I am Peachi!', rooms: ['living'], kind: 'picture', pos: V(9.6, 1.25, 4.1), need: !!tvMesh,
+  def({ id: 'tv', name: 'ทีวีขึ้นคำว่า I am Peachi!', rooms: ['living'], kind: 'picture', alt: ['text'], pos: V(9.6, 1.25, 4.1), need: !!tvMesh,
     on() { const m = tvMesh.userData.onMat || tvMesh.material; m.map = tvArt; m.needsUpdate = true; },
     off() { const m = tvMesh.userData.onMat || tvMesh.material; m.map = tvTex; m.needsUpdate = true; } });
 
@@ -323,7 +323,7 @@ function defs(level) {
   const monTex = level.screens && level.screens.main;
   const monMesh = monTex ? findMesh(monTex) : null;
   const monArt = monitorText();
-  def({ id: 'monitor', name: 'จอคอมขึ้นว่า มอดเห็นฉันมั้ย', rooms: ['stream'], kind: 'text', pos: V(-5.73, 1.15, -6.66), need: !!monMesh,
+  def({ id: 'monitor', name: 'จอคอมขึ้นว่า มอดเห็นฉันมั้ย', rooms: ['stream'], kind: 'text', alt: ['picture'], pos: V(-5.73, 1.15, -6.66), need: !!monMesh,
     on() { monMesh.material.map = monArt; monMesh.material.needsUpdate = true; }, off() { monMesh.material.map = monTex; monMesh.material.needsUpdate = true; } });
 
   // the bathroom door turns blood red
@@ -413,7 +413,7 @@ export class Anomalies {
 
   /** Report a room + kind (or give the anomaly itself: a photo of it). Returns { ok, anomaly }. */
   report(room, kind, direct = null) {
-    const a = direct && direct.active ? direct : this.list.find((x) => x.active && x.rooms.includes(room) && x.kind === kind);
+    const a = direct && direct.active ? direct : this.list.find((x) => x.active && x.rooms.includes(room) && (x.kind === kind || (x.alt && x.alt.includes(kind))));  // words on a screen: either answer
     if (!a) { this.wrong++; return { ok: false }; }
     this._set(a, false);
     this.reported++;
