@@ -52,8 +52,9 @@ export class Hide {
   get noisy() {
     if (!this.spot) return true;
     if (this.gasp > 0) return true;
+    if (this.holding) return false; // holding your breath always works, even with the mic (speakers leak into it)
     if (Scream.usingMic) return (Scream.level || 0) > MIC_LOUD;
-    return !this.holding;
+    return true;
   }
 
   attach() {
@@ -130,9 +131,9 @@ export class Hide {
     const sp = this.spot;
     if (!sp) return;
     let hint;
-    if (this.danger) hint = Scream.usingMic ? 'เธออยู่ตรงนี้… ห้ามส่งเสียง' : 'เธออยู่ตรงนี้… กด Space ค้าง กลั้นหายใจ!';
+    if (this.danger) hint = Scream.usingMic ? 'เธออยู่ตรงนี้… ห้ามส่งเสียง (หรือ Space ค้าง)' : 'เธออยู่ตรงนี้… กด Space ค้าง กลั้นหายใจ!';
     else if (this.gasp > 0) hint = 'แฮ่ก… หายใจไม่ทัน';
-    else hint = Scream.usingMic ? 'เงียบไว้ ไมค์ได้ยินหมด   ·   E ออก' : 'Space ค้าง = กลั้นหายใจ   ·   E ออก';
+    else hint = Scream.usingMic ? 'เงียบไว้ ไมค์ได้ยินหมด · Space ค้าง = กลั้นหายใจ · E ออก' : 'Space ค้าง = กลั้นหายใจ   ·   E ออก';
     UI.setHide({ slit: sp.slit, breath: this.breath, hint, danger: this.danger });
   }
 }

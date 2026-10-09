@@ -218,6 +218,8 @@ export class MiniGames {
     this.kEnd = this.notes[this.notes.length - 1].t + 1.2;
     this.beatT = 0; this.nextBeat = LEAD - BEAT * 4;
     this.hits = 0; this._lyricKey = null;
+    this.keys = false;              // a key/click was used: the song is played on keys from then on
+    this.micFloor = 0; this.micArmed = false; // the mic's level from the speakers alone (count-in)
     this.root.className = 'mg on karaoke';
     this.karaLane.replaceChildren();
     for (const n of this.notes) { n.el = el('span', 'mg-note', this.karaLane, '🍑'); }
@@ -227,9 +229,14 @@ export class MiniGames {
   }
   _karaHit(fromMic) {
     const t = this.t;
+    if (!fromMic) this.keys = true;
     let best = null, bd = 1;
     for (const n of this.notes) { if (n.hit) continue; const d = Math.abs(n.t - t); if (d < bd) { bd = d; best = n; } }
-    if (!best || bd > 0.2) { if (!fromMic) this._rate('พลาด', 'miss'); return; }
+    if (!best || bd > 0.2) {
+      // a press on a note the mic already took is not a miss
+      if (!fromMic && !this.notes.some((n) => n.hit && Math.abs(n.t - t) <= 0.2)) this._rate('พลาด', 'miss');
+      return;
+    }
     best.hit = bd < 0.09 ? 'perfect' : 'good';
     this.hits++;
     best.el.classList.add('hit');
@@ -249,11 +256,21 @@ export class MiniGames {
       const x = hitX + (n.t - now) * speed;
       n.el.style.transform = `translateX(${x.toFixed(1)}px)`;
       n.el.style.opacity = x > W + 20 || x < -40 ? '0' : '1';
-      if (!n.played && now >= n.t) { n.played = true; sfx.play('karaNote', { f: n.f, vol: 0.9 }); }
+      if (!n.played && now >= n.t) { n.played = true; sfx.play('karaNote', { f: n.f, vol: Scream.usingMic && !this.keys ? 0.45 : 0.9 }); }
       if (!n.hit && now > n.t + 0.2 && !n.missed) { n.missed = true; n.el.classList.add('miss'); }
     }
-    // singing into the mic counts when a note is on the ring
-    if (Scream.usingMic && Scream.level > 0.12) { const n = this.notes.find((x) => !x.hit && Math.abs(x.t - now) < 0.15); if (n) this._karaHit(true); }
+    // singing into the mic counts when a note is on the ring: a new sound (an onset), louder than what the
+    // mic hears from the game's own beat during the count-in, and never once keys are being used
+    if (Scream.usingMic && !this.keys) {
+      const lv = Scream.level || 0;
+      if (now < LEAD - 0.1) this.micFloor = Math.max(this.micFloor, lv);
+      const on = Math.min(0.85, Math.max(0.25, this.micFloor * 1.6 + 0.12));
+      if (lv < on * 0.6) this.micArmed = true;
+      else if (this.micArmed && lv > on && now >= LEAD - 0.2) {
+        const n = this.notes.find((x) => !x.hit && Math.abs(x.t - now) < 0.15);
+        if (n) { this.micArmed = false; this._karaHit(true); }
+      }
+    }
     // lyrics (one span per note of the current line; rebuilt only when something changes)
     const cur = this.notes.filter((n) => n.t <= now + 0.05).pop() || this.notes[0];
     const li = cur.line, lineNotes = this.notes.filter((n) => n.line === li);

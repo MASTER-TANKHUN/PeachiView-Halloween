@@ -36,9 +36,25 @@ function load() {
   return d;
 }
 
-function write() {
-  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch { /* no storage */ }
+// Another tab (an old one left open) must never wind progress back: every write first folds in what is
+// already stored, so cleared nights, achievements, endings and finds only ever grow.
+const UNION = ['achievements', 'endings', 'memes', 'scenes', 'tips'];
+function merge(d, s) {
+  if (!s || typeof s !== 'object') return;
+  if (Array.isArray(s.nightsCleared)) for (const n of s.nightsCleared) if (!d.nightsCleared.includes(n)) d.nightsCleared.push(n);
+  d.nightsCleared.sort();
+  for (const k of UNION) if (s[k] && typeof s[k] === 'object') d[k] = { ...s[k], ...(d[k] || {}) };
+  if (s.prologueSeen) d.prologueSeen = true;
 }
+function write() {
+  try {
+    let s = null; try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { s = null; }
+    merge(data, s);
+    localStorage.setItem(KEY, JSON.stringify(data));
+  } catch { /* no storage */ }
+}
+// another tab saved: read it again next time
+if (typeof window !== 'undefined') window.addEventListener('storage', (e) => { if (e.key === KEY || e.key === null) data = null; });
 
 export const Save = {
   get data() { return data || (data = load()); },
@@ -48,8 +64,8 @@ export const Save = {
     this.data.nightsCleared.sort();
     write();
   },
-  /** Highest night the player may start. */
-  get nextNight() { let n = 1; while (this.cleared(n)) n++; return n; },
+  /** Highest night the player may start: the one after the furthest night cleared. */
+  get nextNight() { return Math.max(0, ...this.data.nightsCleared) + 1; },
   set(patch) { Object.assign(this.data, patch); write(); },
   addStats(patch) {
     const s = this.data.stats;
@@ -75,5 +91,5 @@ export const Save = {
     while (this.data.photos.length > 12) this.data.photos.shift();
     write();
   },
-  reset() { data = fresh(); write(); },
+  reset() { data = fresh(); try { localStorage.removeItem(KEY); } catch { /* no storage */ } write(); },
 };
