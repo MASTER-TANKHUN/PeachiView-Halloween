@@ -481,7 +481,7 @@ export class Night2 extends NightBase {
     sfx.play('squelch');
     const fl = this.player.flashlight;
     if (fl) { fl.battery = 0; fl.on = false; }
-    this._addViewers(-20);
+    this._addViewers(DIFF.id === 'hard' ? -20 : -12);
     Talk.say('krasue', pick(KRASUE.lick), { at: this.krasue.position, ms: 2400 });
     for (const [i, m] of ['ยี้ยยยยย', 'จอเลอะหมดแล้ว', 'แบตไฟฉายหมดเลยยย 555'].entries()) setTimeout(() => this.state === 'play' && this.chat(pick(HYPE), m), 400 + i * 500);
     setTimeout(() => { if (this.state === 'play' && fl) { fl.battery = Math.max(fl.battery, 35); UI.toast('เช็ดจอเสร็จ… ไฟฉายชาร์จกลับมานิดหน่อย'); } }, 6500);
