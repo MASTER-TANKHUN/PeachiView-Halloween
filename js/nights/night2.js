@@ -29,7 +29,9 @@ const MIRROR = new THREE.Vector3(9.8355, 1.62, -3.3);
 const WIFI_PW = 'peachi249';
 const KRASUE_USER = 'กระสือ_Official';
 // seconds an anomaly sits unreported before the chat names its room, then what kind of change it is
-const CLUES = () => (DIFF.id === 'easy' ? [15, 35] : DIFF.id === 'hard' ? [45, 90] : [25, 55]);
+const CLUES = () => (DIFF.id === 'easy' ? [10, 22] : DIFF.id === 'hard' ? [40, 80] : [15, 35]);
+// seconds between new anomalies (a correct report brings the next one sooner)
+const GAP = () => (DIFF.id === 'hard' ? [28, 40] : DIFF.id === 'easy' ? [16, 24] : [20, 30]);
 const BOARD_WORDS = { stream: [['ส', 'ต', 'ร', 'ม'], 'สตรีม'], kitchen: [['ค', 'ร', 'ว'], 'ครัว'], living: [['น', 'ง', 'ล', 'น'], 'นั่งเล่น'], bathroom: [['ห', 'ง', 'น'], 'ห้องน้ำ'], hallway: [['ถ', 'ง'], 'โถง'], bedroom: [['ข', 'ก'], 'แขก'] };
 
 
@@ -86,7 +88,7 @@ function router() {
 
 export class Night2 extends NightBase {
   get number() { return 2; }
-  get secondsPerHour() { return 60; }
+  get secondsPerHour() { return 70; }
   get uptimeBase() { return 247; }
 
   constructor(ctx) {
@@ -366,7 +368,7 @@ export class Night2 extends NightBase {
     if (anomalies.spawned > 0) {
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
-        this.spawnT = rand(28, 40);
+        this.spawnT = rand(...GAP());
         const a = anomalies.unresolved < 4 && anomalies.spawnNext(player);
         if (a) {
           const p = this.panAt(a.pos.x, a.pos.z); // a faint glitch from where it happened
@@ -387,7 +389,7 @@ export class Night2 extends NightBase {
     if (!this.inMiniGame) krasue.update(dt, t, { player, camera: this.camera, lures, cameraUp: this.phone.cameraUp, playerHidden: hide.hidden }); // she waits while you can't move
 
     // Peachi hates the dark
-    peachi.moodScale = this.power.on ? 1 : 1.5;
+    peachi.moodScale = this.power.on ? 1 : DIFF.id === 'hard' ? 1.5 : 1.25;
 
 
     this._updatePeach(dt, t);
@@ -404,7 +406,7 @@ export class Night2 extends NightBase {
   // ---------------------------------------------------------------- anomalies
   _firstAnomaly() {
     const a = this.anomalies.spawn('bear') || this.anomalies.spawnNext(this.player);
-    this.spawnT = rand(30, 40);
+    this.spawnT = rand(...GAP());
     this.bot(BOT.anomalyTip);
     this.peachi.line('เอ๊ะ… หมีบนตู้หนังสือห้องนั่งเล่นหันหลังไปแล้ว! มอดไปถ่ายรูปเป็นหลักฐานหน่อย');
     UI.toast('ไปที่ห้องนั่งเล่น กด C ยกกล้อง แล้วคลิกถ่ายหมีบนตู้หนังสือ (หรือ Tab → รายงาน)');
@@ -432,18 +434,18 @@ export class Night2 extends NightBase {
 
   // ---------------------------------------------------------------- blackouts
   _blackout(n) {
-    const hard = n >= 2;
+    const hard = n >= 2, nasty = hard && DIFF.id === 'hard';
     if (!this.power.on) { // still dark from the last one: it just gets worse
-      if (hard) { this.power.hits = Math.max(this.power.hits, 4); this.power.speedK = 1.25; this.krasue.frenzy = true; this.bot(BOT.blackout2); }
+      if (hard) { this.power.hits = Math.max(this.power.hits, nasty ? 4 : 3); this.power.speedK = nasty ? 1.25 : 1.1; this.krasue.frenzy = nasty; this.bot(BOT.blackout2); }
       return;
     }
-    this.power.blackout({ hits: hard ? 4 : 3, speed: hard ? 1.25 : 1 });
-    this.krasue.frenzy = hard;
+    this.power.blackout({ hits: nasty ? 4 : 3, speed: nasty ? 1.25 : hard ? 1.1 : 1 });
+    this.krasue.frenzy = nasty;
     this.requests.cancel();
     this.bot(hard ? BOT.blackout2 : BOT.blackout);
     this.peachi.line(hard ? 'อีกแล้วเหรอ!! มอดดด ไฟฟฟ' : 'กรี๊ด! ไฟดับ! มอดซ่อมไฟที เบรกเกอร์อยู่ในครัว!');
     UI.shake(300);
-    if (hard) this.chat(pick(HYPE), 'กระสือคลั่งแล้ววว ไส้เรืองแสงวิ่งไปมา');
+    if (nasty) this.chat(pick(HYPE), 'กระสือคลั่งแล้ววว ไส้เรืองแสงวิ่งไปมา');
     this._objective();
   }
 
@@ -474,7 +476,7 @@ export class Night2 extends NightBase {
   // ---------------------------------------------------------------- the lick
   _licked() {
     this.stats.licks++;
-    UI.slime(10000);
+    UI.slime(6000);
     UI.shake(250);
     sfx.play('squelch');
     const fl = this.player.flashlight;
@@ -482,7 +484,7 @@ export class Night2 extends NightBase {
     this._addViewers(-20);
     Talk.say('krasue', pick(KRASUE.lick), { at: this.krasue.position, ms: 2400 });
     for (const [i, m] of ['ยี้ยยยยย', 'จอเลอะหมดแล้ว', 'แบตไฟฉายหมดเลยยย 555'].entries()) setTimeout(() => this.state === 'play' && this.chat(pick(HYPE), m), 400 + i * 500);
-    setTimeout(() => { if (this.state === 'play' && fl) { fl.battery = Math.max(fl.battery, 35); UI.toast('เช็ดจอเสร็จ… ไฟฉายชาร์จกลับมานิดหน่อย'); } }, 12000);
+    setTimeout(() => { if (this.state === 'play' && fl) { fl.battery = Math.max(fl.battery, 35); UI.toast('เช็ดจอเสร็จ… ไฟฉายชาร์จกลับมานิดหน่อย'); } }, 6500);
   }
 
   // ---------------------------------------------------------------- the golden peach
@@ -566,10 +568,10 @@ export class Night2 extends NightBase {
     const room = pick(rooms);
     const spots = [...(level.itemSpots || []), ...(level.navPoints || [])].filter((p) => level.roomAt(p) === room);
     const spot = (pick(spots) || new THREE.Vector3(0, 0, 0)).clone();
-    this.seek = { room, t: 60, giggleT: 2.5, sparkT: 0 };
+    this.seek = { room, t: 75, giggleT: 2.5, sparkT: 0 };
     this.seekDone = true;
     this.requests.cancel();
-    peachi.line('เล่นซ่อนแอบกัน! พีชชี่จะแปลงร่างเป็นของในบ้าน หาให้เจอใน 60 วินะ~', 3600);
+    peachi.line('เล่นซ่อนแอบกัน! พีชชี่จะแปลงร่างเป็นของในบ้าน หาให้เจอใน 75 วินะ~', 3600);
     sfx.play('giggle');
     peachi.active = false;
     this._seekSaved = peachi.position.clone();
