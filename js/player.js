@@ -78,10 +78,10 @@ export class Player {
       this.pitch -= m[1] * this.sensitivity;
       this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
     };
-    this._mouseAvg = 0; this._mouseDx = 0; this._lockAt = 0;
+    this._mouse = { avg: [0, 0], last: [0, 0] }; this._lockAt = 0;
     this._onLockChange = () => {
       this.isLocked = document.pointerLockElement === this.domElement;
-      this._lockAt = performance.now(); this._mouseAvg = 0;
+      this._lockAt = performance.now(); this._mouse = { avg: [0, 0], last: [0, 0] };
       if (!this.isLocked) this._clearInput();
     };
     this._onKeyDown = (e) => {
@@ -134,11 +134,15 @@ export class Player {
   _delta(e) {
     const dx = e.movementX || 0, dy = e.movementY || 0;
     if (performance.now() - this._lockAt < 120) return null;
-    const mag = Math.abs(dx) + Math.abs(dy);
-    const avg = this._mouseAvg, flip = dx * this._mouseDx < 0; // a whip back the other way mid-turn
-    this._mouseAvg = avg * 0.7 + Math.min(mag, 400) * 0.3;
-    if (mag > 180 && (mag > (avg + 10) * 6 || (flip && mag > avg * 2.5))) return null;
-    if (dx) this._mouseDx = dx;
+    // each axis on its own: looking up slowly, the browser sometimes reports one big step DOWN (the hidden
+    // cursor hitting the window edge and snapping back), which flips the view to the floor
+    const M = this._mouse, bad = [dx, dy].some((d, k) => {
+      const a = Math.abs(d), avg = M.avg[k], flip = d * M.last[k] < 0;
+      M.avg[k] = avg * 0.7 + Math.min(a, 300) * 0.3;
+      if (d) M.last[k] = d;
+      return a > 50 && (a > (avg + 4) * 8 || (flip && a > avg * 3));
+    });
+    if (bad) { M.last[0] = M.last[1] = 0; return null; }
     return [dx, dy];
   }
 
