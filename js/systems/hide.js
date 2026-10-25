@@ -41,9 +41,10 @@ export class Hide {
     window.addEventListener('keyup', (e) => { if (e.code === 'Space' && this.spot) this._hold(false); });
     document.addEventListener('mousemove', (e) => {
       if (!this.spot || !this.player.isLocked) return;
-      const s = this.player.sensitivity;
-      this.offYaw = Math.max(-this.spot.range, Math.min(this.spot.range, this.offYaw - (e.movementX || 0) * s));
-      this.offPitch = Math.max(-0.3, Math.min(0.3, this.offPitch - (e.movementY || 0) * s));
+      const s = this.player.sensitivity, m = this.player.mouseDelta(e);
+      if (!m) return;
+      this.offYaw = Math.max(-this.spot.range, Math.min(this.spot.range, this.offYaw - m[0] * s));
+      this.offPitch = Math.max(-0.3, Math.min(0.3, this.offPitch - m[1] * s));
     });
   }
 

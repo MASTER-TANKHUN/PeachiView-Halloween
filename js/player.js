@@ -72,12 +72,16 @@ export class Player {
     // ---- input
     this._onMouseMove = (e) => {
       if (!this.isLocked || !this._enabled) return;
-      this.yaw -= (e.movementX || 0) * this.sensitivity;
-      this.pitch -= (e.movementY || 0) * this.sensitivity;
+      const m = this.mouseDelta(e);
+      if (!m) return;
+      this.yaw -= m[0] * this.sensitivity;
+      this.pitch -= m[1] * this.sensitivity;
       this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
     };
+    this._mouseAvg = 0; this._mouseDx = 0; this._lockAt = 0;
     this._onLockChange = () => {
       this.isLocked = document.pointerLockElement === this.domElement;
+      this._lockAt = performance.now(); this._mouseAvg = 0;
       if (!this.isLocked) this._clearInput();
     };
     this._onKeyDown = (e) => {
@@ -113,9 +117,29 @@ export class Player {
   lock() {
     const el = this.domElement;
     if (!el || !el.requestPointerLock) return undefined;
-    const r = el.requestPointerLock();
-    if (r && typeof r.catch === 'function') r.catch(() => {});
+    // raw mouse input where the browser has it (no OS acceleration, none of Chrome's jumps); else the plain lock
+    let r;
+    try { r = el.requestPointerLock({ unadjustedMovement: true }); } catch (e) { r = el.requestPointerLock(); }
+    if (r && typeof r.catch === 'function') return r.catch(() => { const p = el.requestPointerLock(); if (p && p.catch) return p.catch(() => {}); });
     return r;
+  }
+
+  /** The mouse move of one event, or null for a bogus one: right after the lock, and the sudden huge jump
+   *  some browsers report (the hidden cursor snapping back to the middle) that would whip the view around. */
+  mouseDelta(e) {
+    if (e === this._lastEv) return this._lastRes; // the hiding spot reads the same event
+    this._lastEv = e;
+    return (this._lastRes = this._delta(e));
+  }
+  _delta(e) {
+    const dx = e.movementX || 0, dy = e.movementY || 0;
+    if (performance.now() - this._lockAt < 120) return null;
+    const mag = Math.abs(dx) + Math.abs(dy);
+    const avg = this._mouseAvg, flip = dx * this._mouseDx < 0; // a whip back the other way mid-turn
+    this._mouseAvg = avg * 0.7 + Math.min(mag, 400) * 0.3;
+    if (mag > 180 && (mag > (avg + 10) * 6 || (flip && mag > avg * 2.5))) return null;
+    if (dx) this._mouseDx = dx;
+    return [dx, dy];
   }
 
   unlock() { if (document.pointerLockElement === this.domElement) document.exitPointerLock(); }
